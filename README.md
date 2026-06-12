@@ -2,7 +2,6 @@
 
 **ServManager** is a powerful, self-hosted web-based server administration dashboard and remote control tool. Built with an asynchronous Python FastAPI backend and a premium, responsive React UI, it enables you to monitor server health, chain together custom workflow automation, and run ad-hoc scripts directly from your browser.
 
-![ServManager Dashboard](https://via.placeholder.com/1200x600.png?text=ServManager+Premium+Dashboard)
 
 ## Features
 
@@ -23,8 +22,8 @@ ServManager is packaged for seamless integration into `systemd` and can be insta
 1. Download the latest `.deb` package from the [Releases](https://github.com/sahilsidhu7/ServManager/releases) page.
 2. Install the package using `apt`:
    ```bash
-   wget https://github.com/sahilsidhu7/ServManager/releases/download/v1.0.0/servmanager_1.0.0_all.deb
-   sudo apt install ./servmanager_1.0.0_all.deb
+   wget https://github.com/sahilsidhu7/ServManager/releases/download/v1.0.4/servmanager_1.0.4_all.deb
+   sudo apt install ./servmanager_1.0.4_all.deb
    ```
 
 *(The installation automatically builds the Python environment, starts the systemd service, and generates your secure access token).*
