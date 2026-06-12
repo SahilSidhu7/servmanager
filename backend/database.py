@@ -183,7 +183,10 @@ echo "Scan complete."
         "port": 8080,
         "separatePorts": False,
         "remotePort": 8081,
-        "secretToken": secrets.token_hex(16)
+        "secretToken": secrets.token_hex(16),
+        "username": "admin",
+        "password": "admin",
+        "remotePin": "1234"
     },
     "history": []
 }

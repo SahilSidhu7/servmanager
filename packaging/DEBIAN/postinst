@@ -4,13 +4,15 @@ set -e
 INSTALL_DIR="/opt/servmanager"
 VENV_DIR="$INSTALL_DIR/venv"
 SERVICE_FILE="/etc/systemd/system/servmanager.service"
+CLI_SCRIPT="$INSTALL_DIR/servmanager-cli.sh"
+CLI_LINK="/usr/local/bin/servmanager"
 
 echo "[ServManager] Setting up Python virtual environment..."
 python3 -m venv "$VENV_DIR"
 "$VENV_DIR/bin/pip" install --quiet --upgrade pip
 "$VENV_DIR/bin/pip" install --quiet -r "$INSTALL_DIR/backend/requirements.txt"
 
-echo "[ServManager] Configuring database and security token..."
+echo "[ServManager] Configuring database and default credentials..."
 if [ ! -f "$INSTALL_DIR/data.json" ]; then
   "$VENV_DIR/bin/python3" -c "
 import json, secrets
@@ -19,7 +21,15 @@ data = {
   'scripts': [],
   'history': [],
   'remote': {'widgets': []},
-  'settings': {'port': 8080, 'separatePorts': False, 'remotePort': 8081, 'secretToken': token}
+  'settings': {
+    'port': 8080,
+    'separatePorts': False,
+    'remotePort': 8081,
+    'secretToken': token,
+    'username': 'admin',
+    'password': 'admin',
+    'remotePin': '1234'
+  }
 }
 with open('$INSTALL_DIR/data.json', 'w') as f:
     json.dump(data, f, indent=2)
@@ -27,8 +37,10 @@ print(token)
 " > /tmp/sm_token.txt
   TOKEN=$(cat /tmp/sm_token.txt)
   rm -f /tmp/sm_token.txt
+  FIRST_RUN=1
 else
   TOKEN=$("$VENV_DIR/bin/python3" -c "import json; print(json.load(open('$INSTALL_DIR/data.json')).get('settings',{}).get('secretToken',''))" 2>/dev/null || echo "")
+  FIRST_RUN=0
 fi
 
 MAIN_PORT=$("$VENV_DIR/bin/python3" -c "import json; print(json.load(open('$INSTALL_DIR/data.json')).get('settings',{}).get('port',8080))" 2>/dev/null || echo "8080")
@@ -56,10 +68,23 @@ systemctl daemon-reload
 systemctl enable servmanager
 systemctl restart servmanager
 
+echo "[ServManager] Installing CLI helper..."
+if [ -f "$CLI_SCRIPT" ]; then
+  chmod +x "$CLI_SCRIPT"
+  ln -sf "$CLI_SCRIPT" "$CLI_LINK"
+fi
+
 echo "==========================================================="
 echo " ServManager successfully installed and running!"
-echo " Access Token   : $TOKEN"
 echo " Dashboard Port : $MAIN_PORT"
-echo " Access URL     : http://<SERVER_IP>:$MAIN_PORT/?token=$TOKEN"
+echo " Access URL     : http://<SERVER_IP>:$MAIN_PORT/"
+echo " Remote Pad     : http://<SERVER_IP>:$MAIN_PORT/remote"
+if [ "$FIRST_RUN" = "1" ]; then
+  echo ""
+  echo " Default Login  : admin / admin"
+  echo " Default PIN    : 1234"
+  echo " IMPORTANT: Change credentials in Settings after first login!"
+fi
+echo " CLI Help       : sudo servmanager help"
 echo "==========================================================="
 exit 0

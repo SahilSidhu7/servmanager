@@ -103,6 +103,8 @@ manager = ConnectionManager()
 # ─────────────────────────────────────────────────────────
 
 def verify_token(request: Request):
+    if request.url.path in ["/api/login", "/api/remote/login"]:
+        return
     if not request.url.path.startswith("/api/"):
         return
     db = read_db()
@@ -115,6 +117,30 @@ def verify_token(request: Request):
         token = auth_header.split(" ", 1)[1]
     if token != secret_token:
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid access token")
+
+
+@app.post("/api/login")
+async def api_login(payload: dict):
+    username = payload.get("username")
+    password = payload.get("password")
+    db = read_db()
+    settings = db.get("settings", {})
+    expected_username = settings.get("username", "admin")
+    expected_password = settings.get("password", "admin")
+    if username == expected_username and password == expected_password:
+        return {"success": True, "token": settings.get("secretToken", "")}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
+
+
+@app.post("/api/remote/login")
+async def api_remote_login(payload: dict):
+    pin = payload.get("pin")
+    db = read_db()
+    settings = db.get("settings", {})
+    expected_pin = settings.get("remotePin", "1234")
+    if str(pin) == str(expected_pin):
+        return {"success": True, "token": settings.get("secretToken", "")}
+    raise HTTPException(status_code=401, detail="Invalid PIN code")
 
 
 # ─────────────────────────────────────────────────────────
@@ -363,6 +389,9 @@ async def api_get_settings():
         "separatePorts": s.get("separatePorts", False),
         "remotePort": s.get("remotePort", 8081),
         "secretToken": s.get("secretToken", ""),
+        "username": s.get("username", "admin"),
+        "password": s.get("password", "admin"),
+        "remotePin": s.get("remotePin", "1234"),
     }
 
 

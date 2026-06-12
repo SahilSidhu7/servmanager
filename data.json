@@ -125,7 +125,10 @@
     "port": 8080,
     "separatePorts": false,
     "remotePort": 8081,
-    "secretToken": "cc082f409dea7df5884e759171bb2f87"
+    "secretToken": "cc082f409dea7df5884e759171bb2f87",
+    "username": "admin",
+    "password": "admin",
+    "remotePin": "1234"
   },
   "history": []
 }
