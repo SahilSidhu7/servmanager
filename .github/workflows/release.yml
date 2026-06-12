@@ -31,26 +31,14 @@ jobs:
           if [ -z "$VERSION" ] || [ "$VERSION" = "main" ] || [[ "$VERSION" == refs/* ]]; then
             VERSION="1.0.0"
           fi
-          echo "Building package version: $VERSION"
+
           cd packaging
           ./build_deb.sh "$VERSION"
-        
-      # - name: Upload .deb to Release
-      #   uses: softprops/action-gh-release@v1
-      #   if: startsWith(github.ref, 'refs/tags/')
-      #   with:
-      #     files: packaging/build/servmanager_*_all.deb
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: servmanager-deb
-          path: packaging/build/*.deb
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: servmanager-deb
+          name: servmanager-deb-${{ github.run_number }}
           path: packaging/build/*.deb
 
       - name: Upload to Release
