@@ -1,7 +1,7 @@
 Package: servmanager
 Version: 1.0.0
 Architecture: all
-Maintainer: GitHub User <user@example.com>
+Maintainer: SahilSidhu7 <sahilsidhu3127@gmail.com>
 Depends: python3, python3-pip, python3-venv, nodejs, npm, systemd
 Description: ServManager Dashboard
  Powerful self-hosted web-based server administration dashboard 
