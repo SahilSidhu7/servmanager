@@ -106,7 +106,7 @@ mkdir -p "$INSTALL_DIR/scratch"
 echo -e "${YELLOW}[3/7] Copying application files...${NC}"
 cp -R "$SRC_DIR/backend" "$INSTALL_DIR/"
 cp -R "$SRC_DIR/frontend" "$INSTALL_DIR/"
-cp "$SRC_DIR/servmanager-cli.sh" "$INSTALL_DIR/" 2>/dev/null || true
+# CLI script is embedded below and written directly — no copy needed
 
 # Copy data.json if not already present (preserve existing user data)
 if [ ! -f "$INSTALL_DIR/data.json" ]; then
@@ -207,14 +207,122 @@ EOF
 systemctl daemon-reload
 
 # ─────────────────────────────────────────────────────────────
-# Install CLI Helper
+# Install CLI Helper  (always written from embedded heredoc)
 # ─────────────────────────────────────────────────────────────
 echo -e "${YELLOW}[7/7] Installing servmanager CLI helper...${NC}"
-if [ -f "$CLI_SCRIPT" ]; then
-  chmod +x "$CLI_SCRIPT"
-  ln -sf "$CLI_SCRIPT" "$CLI_LINK"
-  echo -e "${GREEN}[OK] CLI installed: run 'sudo servmanager help' anytime.${NC}"
-fi
+
+cat > "$CLI_SCRIPT" << 'CLI_EOF'
+#!/bin/bash
+# ============================================================
+# servmanager – Unified CLI Helper
+# Usage: sudo servmanager <command> [arguments]
+# ============================================================
+set -e
+RED='\033[0;31m'; GREEN='\033[0;32m'; BLUE='\033[0;34m'
+YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+INSTALL_DIR="/opt/servmanager"
+DATA_FILE="$INSTALL_DIR/data.json"
+VENV_PYTHON="$INSTALL_DIR/venv/bin/python3"
+SERVICE_FILE="/etc/systemd/system/servmanager.service"
+GITHUB_REPO="sahilsidhu7/servmanager"
+print_header() {
+  echo ""
+  echo -e "${BLUE}┌─────────────────────────────────────────┐${NC}"
+  echo -e "${BLUE}│        ServManager CLI Helper           │${NC}"
+  echo -e "${BLUE}└─────────────────────────────────────────┘${NC}"
+  echo ""
+}
+require_root() {
+  if [ "$EUID" -ne 0 ]; then
+    echo -e "${RED}[ERROR] This command requires root. Run with sudo.${NC}"; exit 1
+  fi
+}
+require_data() {
+  if [ ! -f "$DATA_FILE" ]; then
+    echo -e "${RED}[ERROR] Config not found at $DATA_FILE${NC}"; exit 1
+  fi
+}
+case "$1" in
+  start)    require_root; systemctl start servmanager;   echo -e "${GREEN}[OK] Started.${NC}" ;;
+  stop)     require_root; systemctl stop servmanager;    echo -e "${GREEN}[OK] Stopped.${NC}" ;;
+  restart)  require_root; systemctl restart servmanager; echo -e "${GREEN}[OK] Restarted.${NC}" ;;
+  status)   systemctl status servmanager --no-pager ;;
+  enable)   require_root; systemctl enable servmanager;  echo -e "${GREEN}[OK] Enabled on boot.${NC}" ;;
+  disable)  require_root; systemctl disable servmanager; echo -e "${YELLOW}[OK] Disabled from boot.${NC}" ;;
+  logs)     journalctl -u servmanager -f --no-pager ;;
+  set-port)
+    require_root; require_data
+    PORT="$2"
+    if [ -z "$PORT" ]; then echo -e "${RED}Usage: servmanager set-port <port>${NC}"; exit 1; fi
+    "$VENV_PYTHON" -c "
+import json
+with open('$DATA_FILE') as f: d=json.load(f)
+d.setdefault('settings',{})['port']=int($PORT)
+with open('$DATA_FILE','w') as f: json.dump(d,f,indent=2)
+"
+    sed -i "s/--port [0-9]*/--port $PORT/" "$SERVICE_FILE"
+    systemctl daemon-reload; systemctl restart servmanager
+    echo -e "${GREEN}[OK] Port set to $PORT and service restarted.${NC}" ;;
+  set-pin)
+    require_root; require_data
+    PIN="$2"
+    if [ -z "$PIN" ] || ! [[ "$PIN" =~ ^[0-9]{4}$ ]]; then
+      echo -e "${RED}Usage: servmanager set-pin <4-digit-number>${NC}"; exit 1; fi
+    "$VENV_PYTHON" -c "
+import json
+with open('$DATA_FILE') as f: d=json.load(f)
+d.setdefault('settings',{})['remotePin']='$PIN'
+with open('$DATA_FILE','w') as f: json.dump(d,f,indent=2)
+"
+    echo -e "${GREEN}[OK] Remote PIN updated to $PIN${NC}" ;;
+  set-auth)
+    require_root; require_data
+    USERNAME="$2"; PASSWORD="$3"
+    if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+      echo -e "${RED}Usage: servmanager set-auth <username> <password>${NC}"; exit 1; fi
+    "$VENV_PYTHON" -c "
+import json
+with open('$DATA_FILE') as f: d=json.load(f)
+d.setdefault('settings',{})['username']='$USERNAME'
+d.setdefault('settings',{})['password']='$PASSWORD'
+with open('$DATA_FILE','w') as f: json.dump(d,f,indent=2)
+"
+    echo -e "${GREEN}[OK] Credentials updated for user: $USERNAME${NC}" ;;
+  update)
+    require_root; print_header
+    echo -e "${CYAN}[>] Fetching latest release from GitHub...${NC}"
+    LATEST=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    if [ -z "$LATEST" ]; then echo -e "${RED}[ERROR] Could not fetch latest version.${NC}"; exit 1; fi
+    echo -e "${GREEN}[>] Latest version: ${LATEST}${NC}"
+    TMP_DIR=$(mktemp -d)
+    curl -sL "https://github.com/${GITHUB_REPO}/archive/refs/tags/${LATEST}.tar.gz" -o "$TMP_DIR/sm.tar.gz"
+    tar -xzf "$TMP_DIR/sm.tar.gz" -C "$TMP_DIR" --strip-components=1
+    bash "$TMP_DIR/install.sh"
+    rm -rf "$TMP_DIR"
+    echo -e "${GREEN}[OK] Updated to $LATEST${NC}" ;;
+  info)
+    require_data
+    PORT=$("$VENV_PYTHON" -c "import json; print(json.load(open('$DATA_FILE')).get('settings',{}).get('port',8080))" 2>/dev/null || echo 8080)
+    IP=$(hostname -I | awk '{print $1}')
+    echo -e "${CYAN}Install Dir : ${YELLOW}$INSTALL_DIR${NC}"
+    echo -e "${CYAN}Dashboard   : ${BLUE}http://$IP:$PORT/${NC}"
+    echo -e "${CYAN}Remote Pad  : ${BLUE}http://$IP:$PORT/remote${NC}" ;;
+  help|--help|-h|"")
+    print_header
+    echo -e "  ${GREEN}Usage: sudo servmanager <command> [args]${NC}"
+    echo ""
+    echo -e "  ${YELLOW}Service:${NC}  start | stop | restart | status | enable | disable | logs"
+    echo -e "  ${YELLOW}Config: ${NC}  set-port <n> | set-pin <4-digits> | set-auth <user> <pass>"
+    echo -e "  ${YELLOW}Other:  ${NC}  update | info | help"
+    echo "" ;;
+  *)
+    echo -e "${RED}Unknown command: $1${NC}  —  run: servmanager help"; exit 1 ;;
+esac
+CLI_EOF
+
+chmod +x "$CLI_SCRIPT"
+ln -sf "$CLI_SCRIPT" "$CLI_LINK"
+echo -e "${GREEN}[OK] CLI installed. Run: sudo servmanager help${NC}"
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════╗${NC}"
