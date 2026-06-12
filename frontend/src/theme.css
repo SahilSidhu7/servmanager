@@ -1,0 +1,68 @@
+/* ServManager — Charcoal & Dark Orange */
+:root {
+  /* Backgrounds — pure charcoal stack, no color cast.
+     Each step is just slightly lighter, nothing jarring. */
+  --bg-dark: #111111;
+  /* page root */
+  --bg-paper: #181818;
+  /* sidebar, topbar, log panel */
+  --bg-warm-1: #1f1f1f;
+  /* card background */
+  --bg-warm-2: #272727;
+  /* hover states */
+  --bg-warm-3: #2e2e2e;
+  /* active / pressed / track fills */
+
+  --bg-card: #1c1c1c;
+  --glass-blur: none;
+  --shadow-main: none;
+  --shadow-card: none;
+
+  /* Primary — dark burnt orange.
+     Not bright safety-orange, not rust-brown.
+     The mid-point that reads as "warm authority". */
+  --primary: #c45c1a;
+  --primary-dark: #9e4612;
+  --primary-light: #e07038;
+  --primary-dim: rgba(196, 92, 26, 0.10);
+  --primary-glow: #c45c1a;
+  /* gradient removed */
+
+  --accent: #c45c1a;
+  --accent-light: #e07038;
+
+  /* Status — desaturated to live comfortably in charcoal.
+     Full-saturation green/red would fight the orange. */
+  --status-success: #7a9e5a;
+  --status-ok: #7a9e5a;
+  --status-ok-l: #96be70;
+  --status-warn: #c49a1a;
+  --status-danger: #b84040;
+  --status-danger-l: #d05555;
+
+  /* Text — warm off-white, never pure #fff.
+     Three steps: readable / secondary / ghost. */
+  --text-main: #d4cfc8;
+  --text-muted: #7a7268;
+  --text-dim: #4a4540;
+
+  /* Borders — almost invisible seams, not glowing lines. */
+  --border-color: #2a2a2a;
+  --border-focus: #c45c1a;
+  --border-glow: rgba(196, 92, 26, 0.2);
+
+  --bg-input: #1c1c1c;
+
+  /* Typography */
+  --font-mono: 'IBM Plex Mono', 'Fira Code', 'Courier New', monospace;
+  --font-sans: 'IBM Plex Mono', monospace;
+
+  /* Geometry — square corners, retro feel */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --border-width: 1px;
+
+  --transition-fast: all 0.1s ease;
+  --transition-smooth: all 0.18s ease;
+}

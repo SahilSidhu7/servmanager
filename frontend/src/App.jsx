@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // ----------------------------------------------------
 // VECTOR SVG ICON REGISTRY COMPONENT
@@ -31,7 +31,9 @@ const SVG_REGISTRY = {
   activity: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></>,
   key: <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>,
   copy: <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></>,
-  info: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></>
+  info: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></>,
+  move: <><polyline points="5 9 2 12 5 15"></polyline><polyline points="9 5 12 2 15 5"></polyline><polyline points="15 19 12 22 9 19"></polyline><polyline points="19 9 22 12 19 15"></polyline><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></>,
+  logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></>
 };
 
 function Icon({ name, className = "icon-svg" }) {
@@ -50,7 +52,14 @@ export default function App() {
   const [view, setView] = useState('stats'); // stats, scripts, workflows, remote-designer, history, settings
   const [authToken, setAuthToken] = useState(localStorage.getItem('servmanager_token') || '');
   const [showAuthModal, setShowAuthModal] = useState(!authToken);
-  const [authInput, setAuthInput] = useState('');
+  const [authUsername, setAuthUsername] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  // PIN state for remote
+  const [pinValue, setPinValue] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [pinShake, setPinShake] = useState(false);
+  const [showRemotePin, setShowRemotePin] = useState(false);
   
   // Real-time system stats
   const [stats, setStats] = useState({
@@ -79,7 +88,10 @@ export default function App() {
     port: 8080,
     separatePorts: false,
     remotePort: 8081,
-    secretToken: ''
+    secretToken: '',
+    username: 'admin',
+    password: '',
+    remotePin: ''
   });
 
   // Terminal modal details
@@ -98,6 +110,8 @@ export default function App() {
   const terminalBottomRef = useRef(null);
   
   const isRemoteRoute = window.location.pathname.startsWith('/remote');
+  const [dragOverId, setDragOverId] = useState(null);
+  const dragItem = useRef(null);
 
   // Token query checking on mount
   useEffect(() => {
@@ -127,7 +141,7 @@ export default function App() {
       const host = window.location.port === '5173' ? 'http://localhost:8080' : '';
       const res = await fetch(`${host}${endpoint}`, options);
       if (res.status === 401) {
-        setShowAuthModal(true);
+        if (isRemoteRoute) { setShowRemotePin(true); } else { setShowAuthModal(true); }
         throw new Error('Unauthorized');
       }
       if (!res.ok) {
@@ -190,6 +204,13 @@ export default function App() {
       if (socketRef.current) socketRef.current.close();
     };
   }, [authToken, currentRunId]);
+
+  // Detect whether remote needs PIN on load
+  useEffect(() => {
+    if (isRemoteRoute && !authToken) {
+      setShowRemotePin(true);
+    }
+  }, []);
 
   // Fetch initial views
   useEffect(() => {
@@ -287,12 +308,73 @@ export default function App() {
     }
   };
 
-  const handleAuthenticate = () => {
-    if (authInput.trim()) {
-      setAuthToken(authInput);
-      localStorage.setItem('servmanager_token', authInput);
-      setShowAuthModal(false);
+  const handleAuthenticate = async () => {
+    if (!authUsername.trim() || !authPassword.trim()) {
+      setAuthError('Please enter both username and password.');
+      return;
     }
+    setAuthError('');
+    try {
+      const host = window.location.port === '5173' ? 'http://localhost:8080' : '';
+      const res = await fetch(`${host}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: authUsername, password: authPassword })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setAuthError(err.detail || 'Login failed. Check your credentials.');
+        return;
+      }
+      const data = await res.json();
+      setAuthToken(data.token);
+      localStorage.setItem('servmanager_token', data.token);
+      setShowAuthModal(false);
+    } catch (e) {
+      setAuthError('Network error. Is ServManager running?');
+    }
+  };
+
+  const handlePinKey = async (digit) => {
+    if (pinShake) return;
+    const next = pinValue + digit;
+    setPinValue(next);
+    setPinError('');
+    if (next.length === 4) {
+      try {
+        const host = window.location.port === '5173' ? 'http://localhost:8080' : '';
+        const res = await fetch(`${host}/api/remote/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: next })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          setPinError(err.detail || 'Incorrect PIN. Try again.');
+          setPinShake(true);
+          setTimeout(() => { setPinValue(''); setPinShake(false); }, 600);
+          return;
+        }
+        const data = await res.json();
+        setAuthToken(data.token);
+        localStorage.setItem('servmanager_token', data.token);
+        setShowRemotePin(false);
+      } catch (e) {
+        setPinError('Network error.');
+        setTimeout(() => { setPinValue(''); }, 600);
+      }
+    }
+  };
+
+  const handlePinDelete = () => {
+    setPinValue(prev => prev.slice(0, -1));
+    setPinError('');
+  };
+
+  const handleLogout = () => {
+    setAuthToken('');
+    localStorage.removeItem('servmanager_token');
+    if (isRemoteRoute) { setShowRemotePin(true); } else { setShowAuthModal(true); }
   };
 
   // Switch tabs
@@ -993,6 +1075,39 @@ export default function App() {
     }
   };
 
+  // Drag-and-drop handlers for Remote Designer
+  const handleDragStart = (e, id) => {
+    dragItem.current = id;
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, id) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (id !== dragItem.current) setDragOverId(id);
+  };
+
+  const handleDrop = (e, targetId) => {
+    e.preventDefault();
+    setDragOverId(null);
+    if (!dragItem.current || dragItem.current === targetId) return;
+    setRemoteWidgets(prev => {
+      const sorted = [...prev].sort((a, b) => a.position - b.position);
+      const fromIdx = sorted.findIndex(w => w.id === dragItem.current);
+      const toIdx = sorted.findIndex(w => w.id === targetId);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      const moved = sorted.splice(fromIdx, 1)[0];
+      sorted.splice(toIdx, 0, moved);
+      return sorted.map((w, i) => ({ ...w, position: i }));
+    });
+    dragItem.current = null;
+  };
+
+  const handleDragEnd = () => {
+    setDragOverId(null);
+    dragItem.current = null;
+  };
+
   const renderRemoteDesigner = () => {
     const boundScripts = scripts.filter(s => s.isButton || s.isIndicator);
     
@@ -1108,7 +1223,18 @@ export default function App() {
                 </div>
               ) : (
                 [...remoteWidgets].sort((a,b) => a.position - b.position).map(w => (
-                  <div key={w.id} className={`preview-widget size-${w.size} accent-${w.color}`}>
+                  <div
+                    key={w.id}
+                    className={`preview-widget size-${w.size} accent-${w.color}${dragOverId === w.id ? ' drag-over' : ''}${dragItem.current === w.id ? ' dragging' : ''}`}
+                    draggable
+                    onDragStart={e => handleDragStart(e, w.id)}
+                    onDragOver={e => handleDragOver(e, w.id)}
+                    onDrop={e => handleDrop(e, w.id)}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <div className="widget-drag-handle" title="Drag to reorder">
+                      <Icon name="move" className="icon-svg" style={{ width: '14px', height: '14px' }} />
+                    </div>
                     <div className="widget-preview-actions">
                       <button className="btn-remove-widget" onClick={() => removeWidgetFromGrid(w.id)}>&times;</button>
                     </div>
@@ -1216,11 +1342,18 @@ export default function App() {
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await apiCall('/api/settings', 'POST', {
+      const payload = {
         port: parseInt(settings.port),
         separatePorts: settings.separatePorts,
-        remotePort: parseInt(settings.remotePort) || 8081
-      });
+        remotePort: parseInt(settings.remotePort) || 8081,
+        username: settings.username,
+        remotePin: settings.remotePin
+      };
+      // Only send password if user typed something new
+      if (settings.password && settings.password.trim()) {
+        payload.password = settings.password;
+      }
+      const res = await apiCall('/api/settings', 'POST', payload);
       alert(res.message);
     } catch (err) {
       alert('Failed to save configuration: ' + err.message);
@@ -1266,18 +1399,35 @@ export default function App() {
               )}
 
               <div className="form-group">
-                <label>Security Client Token</label>
+                <label>Admin Username</label>
+                <input type="text" value={settings.username} onChange={e => setSettings({...settings, username: e.target.value})} placeholder="admin" />
+              </div>
+
+              <div className="form-group">
+                <label>Admin Password</label>
+                <input type="password" value={settings.password} onChange={e => setSettings({...settings, password: e.target.value})} placeholder="Leave blank to keep current" />
+                <small className="text-muted">Leave blank to keep existing password unchanged.</small>
+              </div>
+
+              <div className="form-group">
+                <label>Mobile Remote PIN (4-digit)</label>
+                <input type="text" maxLength="4" pattern="[0-9]{4}" value={settings.remotePin} onChange={e => setSettings({...settings, remotePin: e.target.value.replace(/\D/g, '').slice(0,4)})} placeholder="e.g. 1234" />
+                <small className="text-muted">Used to access the mobile remote panel from your phone.</small>
+              </div>
+
+              <div className="form-group">
+                <label>Security API Token</label>
                 <div className="copy-input-row">
                   <input type="text" readOnly className="bg-card font-mono" value={settings.secretToken} />
                   <button type="button" className="btn btn-secondary btn-icon" onClick={copySecureToken}>
                     <Icon name="copy" />
                   </button>
                 </div>
-                <small className="text-muted">Append this token in query bypass URL paths to skip authentication.</small>
+                <small className="text-muted">Internal token used for API authorization. Auto-generated on install.</small>
               </div>
 
               <button type="submit" className="btn btn-primary margin-top-md">
-                Save Port Configuration
+                Save Configuration
               </button>
             </form>
           </div>
@@ -1333,6 +1483,14 @@ sudo systemctl start servmanager`}</pre>
             <span className="badge badge-success">
               <span className="pulse-dot green" style={{ width: 6, height: 6, marginRight: 4 }}></span> Connected
             </span>
+            <button
+              className="btn btn-secondary"
+              style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', marginLeft: '0.5rem' }}
+              onClick={handleLogout}
+              title="Lock remote panel"
+            >
+              <Icon name="key" /> Lock
+            </button>
           </div>
         </header>
 
@@ -1429,18 +1587,60 @@ sudo systemctl start servmanager`}</pre>
     return (
       <div className="modal-overlay">
         <div className="glass-card modal-content auth-card">
-          <h2 className="text-gradient">ServManager Access</h2>
-          <p>Provide your secure server credentials to proceed.</p>
+          <h2 className="text-gradient">ServManager</h2>
+          <p>Sign in with your admin credentials to access the dashboard.</p>
           <div className="form-group">
-            <input type="password" value={authInput} onChange={e => setAuthInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAuthenticate()} placeholder="Access Token..." />
+            <label>Username</label>
+            <input
+              type="text"
+              value={authUsername}
+              onChange={e => setAuthUsername(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAuthenticate()}
+              placeholder="admin"
+              autoFocus
+            />
           </div>
-          <button className="btn btn-primary" onClick={handleAuthenticate}>Connect Client</button>
+          <div className="form-group">
+            <label>Password</label>
+            <input
+              type="password"
+              value={authPassword}
+              onChange={e => setAuthPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAuthenticate()}
+              placeholder="••••••••"
+            />
+          </div>
+          {authError && <p style={{ color: 'var(--status-danger)', fontSize: '0.88rem', marginBottom: '0.5rem' }}>{authError}</p>}
+          <button className="btn btn-primary" onClick={handleAuthenticate}>Sign In</button>
         </div>
       </div>
     );
   }
 
   if (isRemoteRoute) {
+    if (showRemotePin) {
+      return (
+        <div className="pin-overlay">
+          <div className="pin-card">
+            <h2>Remote Access</h2>
+            <p className="pin-subtitle">Enter your 4-digit PIN to continue</p>
+            <div className="pin-display">
+              {[0,1,2,3].map(i => (
+                <div key={i} className={`pin-dot${i < pinValue.length ? (pinShake ? ' error' : ' filled') : ''}`} />
+              ))}
+            </div>
+            <div className="pin-keypad">
+              {[1,2,3,4,5,6,7,8,9].map(n => (
+                <button key={n} className="pin-key" onClick={() => handlePinKey(String(n))}>{n}</button>
+              ))}
+              <button className="pin-key pin-key-zero" onClick={() => handlePinKey('0')}>0</button>
+              <button className="pin-key pin-key-del" onClick={handlePinDelete}>⌫</button>
+            </div>
+            {pinError && <p className="pin-error-msg">{pinError}</p>}
+          </div>
+        </div>
+      );
+    }
     return renderRemoteView();
   }
 
@@ -1486,6 +1686,11 @@ sudo systemctl start servmanager`}</pre>
               <span className="node-name">{stats.hostname}</span>
               <span className="node-ip">uptime: {formatUptime(stats.uptime)}</span>
             </div>
+          </div>
+          <div className="sidebar-logout">
+            <button className="btn btn-logout" onClick={handleLogout}>
+              <Icon name="logout" /> Sign Out
+            </button>
           </div>
         </div>
       </aside>
