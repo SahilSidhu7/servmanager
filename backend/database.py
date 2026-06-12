@@ -3,7 +3,7 @@ import json
 import secrets
 import threading
 
-DATA_FILE = os.path.join(os.getcwd(), 'data.json')
+DATA_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data.json'))
 db_lock = threading.Lock()
 
 DEFAULT_DATA = {

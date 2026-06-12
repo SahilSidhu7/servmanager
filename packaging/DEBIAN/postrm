@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+# Clean up application directory and services on purge
+if [ "$1" = "purge" ]; then
+    echo "[ServManager] Purging application files and configurations..."
+    rm -rf /opt/servmanager
+    rm -f /etc/systemd/system/servmanager.service
+    systemctl daemon-reload || true
+fi
+
+exit 0

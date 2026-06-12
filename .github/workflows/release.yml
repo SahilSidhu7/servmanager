@@ -23,8 +23,14 @@ jobs:
 
       - name: Build Debian Package
         run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}
+          if [ -z "$VERSION" ] || [ "$VERSION" = "main" ] || [[ "$VERSION" == refs/* ]]; then
+            VERSION="1.0.0"
+          fi
+          echo "Building package version: $VERSION"
           cd packaging
-          ./build_deb.sh
+          ./build_deb.sh "$VERSION"
         
       - name: Upload .deb to Release
         uses: softprops/action-gh-release@v1

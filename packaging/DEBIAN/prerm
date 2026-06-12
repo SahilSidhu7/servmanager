@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+
+# Stop and disable service on removal
+if [ "$1" = "remove" ] || [ "$1" = "deconfigure" ]; then
+    echo "[ServManager] Stopping and disabling systemd service..."
+    systemctl stop servmanager || true
+    systemctl disable servmanager || true
+fi
+
+exit 0
