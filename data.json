@@ -1,0 +1,131 @@
+{
+  "scripts": [
+    {
+      "id": "default-health-check",
+      "name": "Server Health Diagnostics",
+      "description": "Checks CPU load, free memory, and root disk usage. Signals warning if resources are critically low.",
+      "type": "shell",
+      "content": "#!/bin/bash\necho \"=== SERVER HEALTH CHECK ===\"\necho \"Timestamp: $(date)\"\n\n# 1. CPU Load\nCPU_LOAD=$(top -bn1 | grep \"Cpu(s)\" | sed \"s/.*, *\\([0-9.]*\\)%* id.*/\\1/\" | awk '{print 100 - $1}')\necho \"CPU Usage: $CPU_LOAD%\"\n\n# 2. RAM Usage\nRAM_FREE=$(free -m | awk '/Mem:/ {print $4}')\nRAM_TOTAL=$(free -m | awk '/Mem:/ {print $2}')\nRAM_USAGE_PCT=$(free | awk '/Mem:/ {printf \"%.2f\", $3/$2 * 100}')\necho \"RAM Usage: $RAM_USAGE_PCT% ($((RAM_TOTAL - RAM_FREE))MB / ${RAM_TOTAL}MB)\"\n\n# 3. Disk Space (Root)\nDISK_USAGE_PCT=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')\nDISK_FREE=$(df -h / | awk 'NR==2 {print $4}')\necho \"Disk Usage (Root): $DISK_USAGE_PCT% (Free: $DISK_FREE)\"\n\n# 4. Check status\nSTATUS=\"OK\"\nif (( $(echo \"$CPU_LOAD > 90\" | bc -l) )); then\n  echo \"[WARN] High CPU load: $CPU_LOAD%\"\n  STATUS=\"WARN\"\nfi\n\nif (( $(echo \"$RAM_USAGE_PCT > 90\" | bc -l) )); then\n  echo \"[WARN] High RAM usage: $RAM_USAGE_PCT%\"\n  STATUS=\"WARN\"\nfi\n\nif [ \"$DISK_USAGE_PCT\" -gt 85 ]; then\n  echo \"[WARN] High Disk usage: $DISK_USAGE_PCT%\"\n  STATUS=\"WARN\"\nfi\n\necho \"STATUS: $STATUS\"\nif [ \"$STATUS\" = \"OK\" ]; then\n  exit 0\nelse\n  exit 1\nfi\n",
+      "isIndicator": true,
+      "isButton": false,
+      "interval": 10,
+      "lastRun": null,
+      "lastStatus": null,
+      "lastOutput": null
+    },
+    {
+      "id": "default-ports-scanner",
+      "name": "Serving Ports Scanner",
+      "description": "Lists all open TCP and UDP listening ports and maps them to running processes.",
+      "type": "shell",
+      "content": "#!/bin/bash\necho \"=== ACTIVE LISTENING PORTS ===\"\necho \"Scanning for listening sockets...\"\necho \"\"\n\n# Check if ss is available\nif command -v ss >/dev/null 2>&1; then\n  # List TCP and UDP listening ports\n  # (Note: running without sudo may hide some process names, but works)\n  ss -tuln\nelse\n  # Fallback to netstat\n  netstat -tuln\nfi\n\necho \"\"\necho \"Scan complete.\"\n",
+      "isIndicator": false,
+      "isButton": true,
+      "interval": 30,
+      "lastRun": null,
+      "lastStatus": null,
+      "lastOutput": null
+    },
+    {
+      "id": "default-services-monitor",
+      "name": "Critical Services Health",
+      "description": "Checks status of common server daemons: Nginx, SSH, Docker, and MySQL.",
+      "type": "workflow",
+      "workflow": {
+        "steps": [
+          {
+            "id": "step-1",
+            "type": "command",
+            "name": "Check SSH Daemon",
+            "config": {
+              "command": "systemctl is-active ssh || systemctl is-active sshd || echo \"inactive\""
+            }
+          },
+          {
+            "id": "step-2",
+            "type": "command",
+            "name": "Check Docker Daemon",
+            "config": {
+              "command": "systemctl is-active docker || echo \"inactive\""
+            }
+          },
+          {
+            "id": "step-3",
+            "type": "command",
+            "name": "Check Nginx Service",
+            "config": {
+              "command": "systemctl is-active nginx || echo \"inactive\""
+            }
+          }
+        ]
+      },
+      "isIndicator": true,
+      "isButton": true,
+      "interval": 20,
+      "lastRun": null,
+      "lastStatus": null,
+      "lastOutput": null
+    }
+  ],
+  "remote": {
+    "widgets": [
+      {
+        "id": "widget-1",
+        "title": "CPU Usage",
+        "type": "metric",
+        "metricType": "cpu",
+        "size": "small",
+        "color": "indigo",
+        "icon": "cpu",
+        "position": 0
+      },
+      {
+        "id": "widget-2",
+        "title": "RAM Usage",
+        "type": "metric",
+        "metricType": "ram",
+        "size": "small",
+        "color": "violet",
+        "icon": "database",
+        "position": 1
+      },
+      {
+        "id": "widget-3",
+        "title": "Server Diagnostics",
+        "type": "indicator",
+        "scriptId": "default-health-check",
+        "size": "medium",
+        "color": "emerald",
+        "icon": "heart-rate",
+        "position": 2
+      },
+      {
+        "id": "widget-4",
+        "title": "Scan Server Ports",
+        "type": "button",
+        "scriptId": "default-ports-scanner",
+        "size": "small",
+        "color": "amber",
+        "icon": "terminal",
+        "position": 3
+      },
+      {
+        "id": "widget-5",
+        "title": "Services Checker",
+        "type": "button",
+        "scriptId": "default-services-monitor",
+        "size": "small",
+        "color": "indigo",
+        "icon": "refresh",
+        "position": 4
+      }
+    ]
+  },
+  "settings": {
+    "port": 8080,
+    "separatePorts": false,
+    "remotePort": 8081,
+    "secretToken": "cc082f409dea7df5884e759171bb2f87"
+  },
+  "history": []
+}

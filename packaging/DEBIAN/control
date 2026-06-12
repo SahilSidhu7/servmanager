@@ -1,0 +1,9 @@
+Package: servmanager
+Version: 1.0.0
+Architecture: all
+Maintainer: GitHub User <user@example.com>
+Depends: python3, python3-pip, python3-venv, nodejs, npm, systemd
+Description: ServManager Dashboard
+ Powerful self-hosted web-based server administration dashboard 
+ and remote control tool. Features real-time diagnostics, a port 
+ scanner, script execution, and an automation workflow assembler.

@@ -1,0 +1,65 @@
+#!/bin/bash
+set -e
+
+INSTALL_DIR="/opt/servmanager"
+VENV_DIR="$INSTALL_DIR/venv"
+SERVICE_FILE="/etc/systemd/system/servmanager.service"
+
+echo "[ServManager] Setting up Python virtual environment..."
+python3 -m venv "$VENV_DIR"
+"$VENV_DIR/bin/pip" install --quiet --upgrade pip
+"$VENV_DIR/bin/pip" install --quiet -r "$INSTALL_DIR/backend/requirements.txt"
+
+echo "[ServManager] Configuring database and security token..."
+if [ ! -f "$INSTALL_DIR/data.json" ]; then
+  "$VENV_DIR/bin/python3" -c "
+import json, secrets
+token = secrets.token_urlsafe(32)
+data = {
+  'scripts': [],
+  'history': [],
+  'remote': {'widgets': []},
+  'settings': {'port': 8080, 'separatePorts': False, 'remotePort': 8081, 'secretToken': token}
+}
+with open('$INSTALL_DIR/data.json', 'w') as f:
+    json.dump(data, f, indent=2)
+print(token)
+" > /tmp/sm_token.txt
+  TOKEN=$(cat /tmp/sm_token.txt)
+  rm -f /tmp/sm_token.txt
+else
+  TOKEN=$("$VENV_DIR/bin/python3" -c "import json; print(json.load(open('$INSTALL_DIR/data.json')).get('settings',{}).get('secretToken',''))" 2>/dev/null || echo "")
+fi
+
+MAIN_PORT=$("$VENV_DIR/bin/python3" -c "import json; print(json.load(open('$INSTALL_DIR/data.json')).get('settings',{}).get('port',8080))" 2>/dev/null || echo "8080")
+
+echo "[ServManager] Installing systemd service..."
+cat > "$SERVICE_FILE" <<EOF
+[Unit]
+Description=ServManager - Python FastAPI Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$INSTALL_DIR/backend
+ExecStart=$VENV_DIR/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port $MAIN_PORT
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable servmanager
+systemctl restart servmanager
+
+echo "==========================================================="
+echo " ServManager successfully installed and running!"
+echo " Access Token   : $TOKEN"
+echo " Dashboard Port : $MAIN_PORT"
+echo " Access URL     : http://<SERVER_IP>:$MAIN_PORT/?token=$TOKEN"
+echo "==========================================================="
+exit 0
