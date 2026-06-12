@@ -20,10 +20,10 @@ ServManager is packaged for seamless integration into `systemd` and can be insta
 
 ### Method 1: Install via APT (GitHub Releases)
 
-1. Download the latest `.deb` package from the [Releases](https://github.com/YOUR_GITHUB_USERNAME/ServManager/releases) page.
+1. Download the latest `.deb` package from the [Releases](https://github.com/sahilsidhu7/ServManager/releases) page.
 2. Install the package using `apt`:
    ```bash
-   wget https://github.com/YOUR_GITHUB_USERNAME/ServManager/releases/download/v1.0.0/servmanager_1.0.0_all.deb
+   wget https://github.com/sahilsidhu7/ServManager/releases/download/v1.0.0/servmanager_1.0.0_all.deb
    sudo apt install ./servmanager_1.0.0_all.deb
    ```
 
@@ -33,7 +33,7 @@ ServManager is packaged for seamless integration into `systemd` and can be insta
 
 If you prefer building from source, download the repository and run the automated installer:
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/ServManager.git
+git clone https://github.com/sahilsidhu7/ServManager.git
 cd ServManager
 sudo ./install.sh
 ```
