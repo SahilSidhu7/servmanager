@@ -282,6 +282,10 @@ export default function App() {
 
   // Run script action
   const runScript = async (script, trigger = 'manual') => {
+    if (!script) {
+      console.warn("Attempted to run undefined script/workflow");
+      return;
+    }
     setTerminalTitle(`Executing: ${script.name}`);
     setTerminalLogs(['Connecting process to server...']);
     setTerminalStatus('Spawning');
@@ -1511,7 +1515,7 @@ sudo systemctl start servmanager`}</pre>
 
               if (w.type === 'button') {
                 return (
-                  <div key={w.id} className={`remote-widget size-${w.size} accent-${w.color} ${isRunning ? 'running' : ''}`} onClick={() => !isRunning && runScript(script, 'remote')}>
+                  <div key={w.id} className={`remote-widget size-${w.size} accent-${w.color} ${isRunning ? 'running' : ''}`} onClick={() => !isRunning && script && runScript(script, 'remote')}>
                     <div className="widget-icon-wrap"><Icon name={w.icon} /></div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <div className="widget-title-display">{w.title}</div>
