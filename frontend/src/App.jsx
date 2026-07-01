@@ -1,119 +1,323 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import '@xterm/xterm/css/xterm.css';
 
-// ----------------------------------------------------
-// VECTOR SVG ICON REGISTRY COMPONENT
-// ----------------------------------------------------
+// ─────────────────────────────────────────────────────────
+// SVG ICON REGISTRY
+// ─────────────────────────────────────────────────────────
 const SVG_REGISTRY = {
   cpu: <><path d="M4 4h16v16H4zM9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></>,
-  database: <><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></>,
-  terminal: <><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></>,
+  database: <><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></>,
+  terminal: <><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></>,
   refresh: <><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></>,
-  settings: <><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></>,
-  home: <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></>,
+  settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
+  home: <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
   flow: <><path d="M12 2v20M17 5H7M12 12h8M4 12h8M12 19h5M7 19h5"/></>,
-  layout: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="9" y1="9" x2="21" y2="9"></line><line x1="9" y1="15" x2="21" y2="15"></line></>,
-  stats: <><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></>,
-  plus: <><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></>,
-  trash: <><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></>,
-  edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></>,
-  play: <><polygon points="5 3 19 12 5 21 5 3"></polygon></>,
-  stop: <><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></>,
-  check: <><polyline points="20 6 9 17 4 12"></polyline></>,
-  alert: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></>,
-  close: <><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></>,
-  'external-link': <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></>,
-  search: <><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></>,
-  code: <><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></>,
-  eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></>,
-  save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></>,
-  server: <><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></>,
+  layout: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="9" y1="9" x2="21" y2="9"/><line x1="9" y1="15" x2="21" y2="15"/></>,
+  stats: <><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
+  plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+  trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
+  edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
+  play: <><polygon points="5 3 19 12 5 21 5 3"/></>,
+  stop: <><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/></>,
+  check: <><polyline points="20 6 9 17 4 12"/></>,
+  alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+  close: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+  'external-link': <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></>,
+  search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+  code: <><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></>,
+  eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
+  save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>,
+  server: <><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></>,
   'heart-rate': <><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></>,
-  activity: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></>,
+  activity: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>,
   key: <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>,
-  copy: <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></>,
-  info: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></>,
-  move: <><polyline points="5 9 2 12 5 15"></polyline><polyline points="9 5 12 2 15 5"></polyline><polyline points="15 19 12 22 9 19"></polyline><polyline points="19 9 22 12 19 15"></polyline><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></>,
-  logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></>
+  copy: <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>,
+  info: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
+  move: <><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></>,
+  logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
+  ssh: <><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 9l2 2-2 2M11 13h4"/></>,
+  qrcode: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="5" y="5" width="3" height="3"/><rect x="16" y="5" width="3" height="3"/><rect x="5" y="16" width="3" height="3"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 17h3"/></>,
+  wifi: <><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></>,
+  shield: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
+  upload: <><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></>,
 };
 
-function Icon({ name, className = "icon-svg" }) {
+function Icon({ name, className = 'icon-svg' }) {
   const inner = SVG_REGISTRY[name] || <circle cx="12" cy="12" r="8"/>;
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className} strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}
+      strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round">
       {inner}
     </svg>
   );
 }
 
-// ----------------------------------------------------
-// MAIN APP COMPONENT
-// ----------------------------------------------------
+// ─────────────────────────────────────────────────────────
+// TOAST NOTIFICATION SYSTEM
+// ─────────────────────────────────────────────────────────
+function ToastContainer({ toasts, onRemove }) {
+  return (
+    <div className="toast-container">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast toast-${t.type}`}>
+          <Icon name={t.type === 'success' ? 'check' : t.type === 'error' ? 'alert' : 'info'} />
+          <span>{t.message}</span>
+          <button className="toast-close" onClick={() => onRemove(t.id)}>&times;</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+// CODE EDITOR WITH LINE NUMBERS
+// ─────────────────────────────────────────────────────────
+function CodeEditor({ value, onChange, placeholder, minHeight = '280px' }) {
+  const textareaRef = useRef(null);
+  const gutterRef = useRef(null);
+
+  const lines = (value || '').split('\n');
+
+  const syncScroll = () => {
+    if (textareaRef.current && gutterRef.current) {
+      gutterRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    const ta = e.target;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const newVal = value.substring(0, start) + '  ' + value.substring(end);
+      onChange(newVal);
+      requestAnimationFrame(() => {
+        ta.selectionStart = start + 2;
+        ta.selectionEnd = start + 2;
+      });
+    } else if (e.key === 'Enter') {
+      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      const currentLine = value.substring(lineStart, start);
+      const indent = currentLine.match(/^(\s*)/)[1];
+      e.preventDefault();
+      const newVal = value.substring(0, start) + '\n' + indent + value.substring(end);
+      onChange(newVal);
+      requestAnimationFrame(() => {
+        const pos = start + 1 + indent.length;
+        ta.selectionStart = pos;
+        ta.selectionEnd = pos;
+      });
+    }
+  };
+
+  return (
+    <div className="code-editor-wrap">
+      <div className="code-editor-gutter" ref={gutterRef}>
+        {lines.map((_, i) => (
+          <div key={i} className="code-line-num">{i + 1}</div>
+        ))}
+      </div>
+      <textarea
+        ref={textareaRef}
+        className="code-editor-area"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onScroll={syncScroll}
+        placeholder={placeholder || '#!/bin/bash\n# Write your script here\necho "Hello, server!"\nexit 0'}
+        spellCheck={false}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        style={{ minHeight }}
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+// SSH TERMINAL MODAL (xterm.js)
+// ─────────────────────────────────────────────────────────
+function SshTerminalModal({ conn, token, onClose }) {
+  const containerRef = useRef(null);
+  const cleanupRef = useRef(null);
+  const [status, setStatus] = useState('connecting');
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    let term, fitAddon, ws;
+
+    const setup = async () => {
+      const { Terminal } = await import('@xterm/xterm');
+      const { FitAddon } = await import('@xterm/addon-fit');
+
+      term = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: '"IBM Plex Mono", "Fira Code", monospace',
+        theme: {
+          background: '#0a0a0a',
+          foreground: '#d4cfc8',
+          cursor: '#c45c1a',
+          selectionBackground: 'rgba(196, 92, 26, 0.3)',
+          black: '#111111',
+          brightBlack: '#2a2a2a',
+        },
+        convertEol: true,
+        scrollback: 5000,
+      });
+
+      fitAddon = new FitAddon();
+      term.loadAddon(fitAddon);
+      term.open(containerRef.current);
+      fitAddon.fit();
+
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.port === '5173' ? 'localhost:8080' : window.location.host;
+      ws = new WebSocket(`${protocol}//${host}/ws/ssh/${conn.id}?token=${encodeURIComponent(token)}`);
+
+      term.write(`\x1b[33mConnecting to ${conn.username}@${conn.host}:${conn.port || 22}...\x1b[0m\r\n`);
+
+      ws.onopen = () => {
+        setStatus('connected');
+        term.write('\x1b[32mSession established.\x1b[0m\r\n\r\n');
+        term.focus();
+      };
+
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'data') term.write(msg.data);
+        else if (msg.type === 'error') {
+          setStatus('error');
+          term.write(`\r\n\x1b[31m${msg.data}\x1b[0m\r\n`);
+        }
+      };
+
+      ws.onclose = () => {
+        setStatus('closed');
+        term.write('\r\n\x1b[33m[Connection closed]\x1b[0m\r\n');
+      };
+
+      ws.onerror = () => {
+        setStatus('error');
+        term.write('\r\n\x1b[31m[WebSocket error - check network]\x1b[0m\r\n');
+      };
+
+      term.onData(data => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'data', data }));
+        }
+      });
+
+      const ro = new ResizeObserver(() => {
+        try {
+          fitAddon.fit();
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+          }
+        } catch (_) {}
+      });
+      ro.observe(containerRef.current);
+
+      cleanupRef.current = () => {
+        ro.disconnect();
+        ws.close();
+        term.dispose();
+      };
+    };
+
+    setup().catch(() => setStatus('error'));
+
+    return () => { if (cleanupRef.current) cleanupRef.current(); };
+  }, [conn.id, token]);
+
+  const statusBadge = status === 'connected'
+    ? 'badge-success' : status === 'error' || status === 'closed'
+    ? 'badge-danger' : 'badge-warn';
+
+  return (
+    <div className="ssh-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="ssh-terminal-card">
+        <div className="ssh-terminal-header">
+          <div className="ssh-terminal-info">
+            <Icon name="ssh" />
+            <span>{conn.name}</span>
+            <span className="font-mono" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+              {conn.username}@{conn.host}:{conn.port || 22}
+            </span>
+            <span className={`badge ${statusBadge}`}>{status}</span>
+          </div>
+          <button className="btn btn-secondary btn-icon" onClick={onClose}>
+            <Icon name="close" />
+          </button>
+        </div>
+        <div ref={containerRef} className="ssh-terminal-body" />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+// MAIN APP
+// ─────────────────────────────────────────────────────────
 export default function App() {
-  const [view, setView] = useState('stats'); // stats, scripts, workflows, remote-designer, history, settings
+  const [view, setView] = useState('stats');
   const [authToken, setAuthToken] = useState(localStorage.getItem('servmanager_token') || '');
-  const [showAuthModal, setShowAuthModal] = useState(!authToken);
+  const [showAuthModal, setShowAuthModal] = useState(!localStorage.getItem('servmanager_token'));
   const [authUsername, setAuthUsername] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
-  // PIN state for remote
+
   const [pinValue, setPinValue] = useState('');
   const [pinError, setPinError] = useState('');
   const [pinShake, setPinShake] = useState(false);
   const [showRemotePin, setShowRemotePin] = useState(false);
-  
-  // Real-time system stats
-  const [stats, setStats] = useState({
-    cpu: 0,
-    ram: { total: 0, used: 0, pct: 0 },
-    disk: { total: '0G', used: '0G', pct: 0 },
-    uptime: 0,
-    hostname: 'loading...',
-    platform: ''
-  });
-  
-  // Listening Ports list
-  const [ports, setPorts] = useState([]);
-  
-  // Scripts and Workflows lists
-  const [scripts, setScripts] = useState([]);
-  
-  // Remote Layout widgets
-  const [remoteWidgets, setRemoteWidgets] = useState([]);
-  
-  // Logs history
-  const [history, setHistory] = useState([]);
-  
-  // Daemon settings
-  const [settings, setSettings] = useState({
-    port: 8080,
-    separatePorts: false,
-    remotePort: 8081,
-    secretToken: '',
-    username: 'admin',
-    password: '',
-    remotePin: ''
-  });
 
-  // Terminal modal details
+  const [stats, setStats] = useState({ cpu: 0, ram: { total: 0, used: 0, pct: 0 }, disk: { total: '0G', used: '0G', pct: 0 }, uptime: 0, hostname: 'loading...', platform: '' });
+  const [ports, setPorts] = useState([]);
+  const [scripts, setScripts] = useState([]);
+  const [remoteWidgets, setRemoteWidgets] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [settings, setSettings] = useState({ port: 8080, secretToken: '', username: 'admin', password: '', remotePin: '' });
+  const [sshConnections, setSshConnections] = useState([]);
+
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalTitle, setTerminalTitle] = useState('');
   const [terminalLogs, setTerminalLogs] = useState([]);
-  const [terminalStatus, setTerminalStatus] = useState('Running'); // Running, Finished, Cancelled
+  const [terminalStatus, setTerminalStatus] = useState('Running');
   const [terminalExitCode, setTerminalExitCode] = useState(0);
   const [currentRunId, setCurrentRunId] = useState(null);
 
-  // Slide-up Remote Drawer
   const [remoteDrawerOpen, setRemoteDrawerOpen] = useState(false);
   const [remoteDrawerTitle, setRemoteDrawerTitle] = useState('');
 
+  const [showQR, setShowQR] = useState(false);
+  const [remoteUrl, setRemoteUrl] = useState('');
+  const [sshTerminalConn, setSshTerminalConn] = useState(null);
+
+  const [toasts, setToasts] = useState([]);
+
   const socketRef = useRef(null);
   const terminalBottomRef = useRef(null);
-  
-  const isRemoteRoute = window.location.pathname.startsWith('/remote');
-  const [dragOverId, setDragOverId] = useState(null);
   const dragItem = useRef(null);
+  const [dragOverId, setDragOverId] = useState(null);
 
-  // Token query checking on mount
+  const isRemoteRoute = window.location.pathname.startsWith('/remote');
+
+  // ── Toast helpers ──────────────────────────────────────
+  const addToast = useCallback((message, type = 'info', duration = 3500) => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration);
+  }, []);
+
+  const removeToast = useCallback(id => setToasts(prev => prev.filter(t => t.id !== id)), []);
+
+  // ── Token query-param on mount ─────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -121,27 +325,21 @@ export default function App() {
       setAuthToken(token);
       localStorage.setItem('servmanager_token', token);
       setShowAuthModal(false);
-      // Clean query string
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
-  // API Request Helper
-  const apiCall = async (endpoint, method = 'GET', body = null) => {
-    const headers = { 'Content-Type': 'application/json' };
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-    }
+  // ── API helper ─────────────────────────────────────────
+  const apiCall = useCallback(async (endpoint, method = 'GET', body = null) => {
+    const token = localStorage.getItem('servmanager_token') || authToken;
+    const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
     const options = { method, headers };
-    if (body) {
-      options.body = JSON.stringify(body);
-    }
-
+    if (body) options.body = JSON.stringify(body);
     try {
       const host = window.location.port === '5173' ? 'http://localhost:8080' : '';
       const res = await fetch(`${host}${endpoint}`, options);
       if (res.status === 401) {
-        if (isRemoteRoute) { setShowRemotePin(true); } else { setShowAuthModal(true); }
+        if (isRemoteRoute) setShowRemotePin(true); else setShowAuthModal(true);
         throw new Error('Unauthorized');
       }
       if (!res.ok) {
@@ -150,41 +348,28 @@ export default function App() {
       }
       return await res.json();
     } catch (e) {
-      console.error(`API Call failed: ${endpoint}`, e);
       throw e;
     }
-  };
+  }, [authToken, isRemoteRoute]);
 
-  // WebSocket Connection
+  // ── WebSocket ──────────────────────────────────────────
   useEffect(() => {
     if (!authToken) return;
-
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.port === '5173' ? 'localhost:8080' : window.location.host;
-    const wsUrl = `${protocol}//${host}/ws`;
 
-    const connectWs = () => {
-      const ws = new WebSocket(wsUrl);
+    const connect = () => {
+      const ws = new WebSocket(`${protocol}//${host}/ws`);
       socketRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('WebSocket connected');
-        ws.send(JSON.stringify({ type: 'subscribe-stats' }));
-      };
-
+      ws.onopen = () => ws.send(JSON.stringify({ type: 'subscribe-stats' }));
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
-        if (msg.type === 'stats') {
-          setStats(msg.data);
-        } else if (msg.type === 'log') {
-          setTerminalLogs(prev => [...prev, msg.text]);
-        } else if (msg.type === 'script-finished') {
-          if (msg.runId === currentRunId || currentRunId === null) {
-            setTerminalStatus(msg.status === 'success' ? 'Finished' : msg.status === 'cancelled' ? 'Cancelled' : 'Failed');
-            setTerminalExitCode(msg.exitCode);
-            // Remove loading flags from scripts
-            setScripts(prev => prev.map(s => s.id === msg.scriptId ? { ...s, lastStatus: msg.status } : s));
-          }
+        if (msg.type === 'stats') setStats(msg.data);
+        else if (msg.type === 'log') setTerminalLogs(prev => [...prev, msg.text]);
+        else if (msg.type === 'script-finished') {
+          setTerminalStatus(msg.status === 'success' ? 'Finished' : msg.status === 'cancelled' ? 'Cancelled' : 'Failed');
+          setTerminalExitCode(msg.exitCode);
+          setScripts(prev => prev.map(s => s.id === msg.scriptId ? { ...s, lastStatus: msg.status } : s));
           fetchScripts();
         } else if (msg.type === 'indicator-update') {
           setScripts(prev => prev.map(s => s.id === msg.scriptId ? { ...s, lastStatus: msg.lastStatus, lastOutput: msg.lastOutput } : s));
@@ -192,151 +377,95 @@ export default function App() {
           fetchRemoteConfig();
         }
       };
-
-      ws.onclose = () => {
-        console.log('WebSocket connection lost, reconnecting...');
-        setTimeout(connectWs, 3000);
-      };
+      ws.onclose = () => setTimeout(connect, 3000);
     };
 
-    connectWs();
-    return () => {
-      if (socketRef.current) socketRef.current.close();
-    };
-  }, [authToken, currentRunId]);
+    connect();
+    return () => { if (socketRef.current) socketRef.current.close(); };
+  }, [authToken]);
 
-  // Detect whether remote needs PIN on load
   useEffect(() => {
-    if (isRemoteRoute && !authToken) {
-      setShowRemotePin(true);
-    }
+    if (isRemoteRoute && !authToken) setShowRemotePin(true);
   }, []);
 
-  // Fetch initial views
   useEffect(() => {
     if (!authToken) return;
     if (isRemoteRoute) {
       fetchRemoteConfig();
       fetchScripts();
+      fetchSshConnections();
     } else {
-      loadViewDetails(view);
+      loadViewData(view);
     }
   }, [authToken, view]);
 
-  // Scroll terminal logs to bottom on append
   useEffect(() => {
     if (terminalBottomRef.current) {
       terminalBottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [terminalLogs, terminalOpen, remoteDrawerOpen]);
 
-  const loadViewDetails = (targetView) => {
-    if (targetView === 'stats') {
-      fetchPorts();
-    } else if (targetView === 'scripts' || targetView === 'workflows') {
-      fetchScripts();
-    } else if (targetView === 'remote-designer') {
-      fetchRemoteConfig();
-      fetchScripts();
-    } else if (targetView === 'history') {
-      fetchHistory();
-    } else if (targetView === 'settings') {
-      fetchSettings();
-    }
+  // ── Data fetchers ──────────────────────────────────────
+  const fetchPorts = async () => { try { setPorts(await apiCall('/api/system/ports')); } catch (_) {} };
+  const fetchScripts = async () => { try { setScripts(await apiCall('/api/scripts')); } catch (_) {} };
+  const fetchRemoteConfig = async () => { try { const d = await apiCall('/api/remote/config'); setRemoteWidgets(d.widgets || []); } catch (_) {} };
+  const fetchHistory = async () => { try { setHistory(await apiCall('/api/history')); } catch (_) {} };
+  const fetchSettings = async () => { try { setSettings(await apiCall('/api/settings')); } catch (_) {} };
+  const fetchSshConnections = async () => { try { setSshConnections(await apiCall('/api/ssh/connections')); } catch (_) {} };
+
+  const loadViewData = (v) => {
+    if (v === 'stats') fetchPorts();
+    else if (v === 'scripts' || v === 'workflows') fetchScripts();
+    else if (v === 'remote-designer') { fetchRemoteConfig(); fetchScripts(); fetchSshConnections(); }
+    else if (v === 'history') fetchHistory();
+    else if (v === 'settings') fetchSettings();
+    else if (v === 'ssh-connections') fetchSshConnections();
   };
 
-  const fetchPorts = async () => {
-    try {
-      const data = await apiCall('/api/system/ports');
-      setPorts(data);
-    } catch (e) {}
+  const formatUptime = (s) => {
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    return `${d > 0 ? d + 'd ' : ''}${h}h ${m}m`;
   };
 
-  const fetchScripts = async () => {
-    try {
-      const data = await apiCall('/api/scripts');
-      setScripts(data);
-    } catch (e) {}
-  };
-
-  const fetchRemoteConfig = async () => {
-    try {
-      const data = await apiCall('/api/remote/config');
-      setRemoteWidgets(data.widgets || []);
-    } catch (e) {}
-  };
-
-  const fetchHistory = async () => {
-    try {
-      const data = await apiCall('/api/history');
-      setHistory(data);
-    } catch (e) {}
-  };
-
-  const fetchSettings = async () => {
-    try {
-      const data = await apiCall('/api/settings');
-      setSettings(data);
-    } catch (e) {}
-  };
-
-  // Run script action
+  // ── Script execution ───────────────────────────────────
   const runScript = async (script, trigger = 'manual') => {
-    if (!script) {
-      console.warn("Attempted to run undefined script/workflow");
-      return;
-    }
+    if (!script) return;
     setTerminalTitle(`Executing: ${script.name}`);
-    setTerminalLogs(['Connecting process to server...']);
+    setTerminalLogs(['Connecting to server process...']);
     setTerminalStatus('Spawning');
     setTerminalOpen(true);
     setRemoteDrawerOpen(true);
     setRemoteDrawerTitle(script.name);
-
     try {
       const res = await apiCall('/api/scripts/run', 'POST', { id: script.id, trigger });
       setCurrentRunId(res.runId);
-      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
         socketRef.current.send(JSON.stringify({ type: 'subscribe-log', runId: res.runId }));
       }
       setTerminalStatus('Running');
     } catch (err) {
-      setTerminalLogs(prev => [...prev, `[system-err] Failed to start execution: ${err.message}`]);
+      setTerminalLogs(prev => [...prev, `[system-err] Failed to start: ${err.message}`]);
       setTerminalStatus('Failed');
     }
   };
 
   const cancelExecution = async () => {
-    if (currentRunId) {
-      await apiCall('/api/scripts/cancel', 'POST', { runId: currentRunId });
-    }
+    if (currentRunId) await apiCall('/api/scripts/cancel', 'POST', { runId: currentRunId });
   };
 
+  // ── Auth handlers ──────────────────────────────────────
   const handleAuthenticate = async () => {
-    if (!authUsername.trim() || !authPassword.trim()) {
-      setAuthError('Please enter both username and password.');
-      return;
-    }
+    if (!authUsername.trim() || !authPassword.trim()) { setAuthError('Enter username and password.'); return; }
     setAuthError('');
     try {
       const host = window.location.port === '5173' ? 'http://localhost:8080' : '';
-      const res = await fetch(`${host}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: authUsername, password: authPassword })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        setAuthError(err.detail || 'Login failed. Check your credentials.');
-        return;
-      }
+      const res = await fetch(`${host}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: authUsername, password: authPassword }) });
+      if (!res.ok) { const e = await res.json(); setAuthError(e.detail || 'Login failed.'); return; }
       const data = await res.json();
       setAuthToken(data.token);
       localStorage.setItem('servmanager_token', data.token);
       setShowAuthModal(false);
-    } catch (e) {
-      setAuthError('Network error. Is ServManager running?');
-    }
+    } catch (_) { setAuthError('Network error. Is ServManager running?'); }
   };
 
   const handlePinKey = async (digit) => {
@@ -347,14 +476,10 @@ export default function App() {
     if (next.length === 4) {
       try {
         const host = window.location.port === '5173' ? 'http://localhost:8080' : '';
-        const res = await fetch(`${host}/api/remote/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin: next })
-        });
+        const res = await fetch(`${host}/api/remote/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: next }) });
         if (!res.ok) {
-          const err = await res.json();
-          setPinError(err.detail || 'Incorrect PIN. Try again.');
+          const e = await res.json();
+          setPinError(e.detail || 'Incorrect PIN.');
           setPinShake(true);
           setTimeout(() => { setPinValue(''); setPinShake(false); }, 600);
           return;
@@ -363,105 +488,59 @@ export default function App() {
         setAuthToken(data.token);
         localStorage.setItem('servmanager_token', data.token);
         setShowRemotePin(false);
-      } catch (e) {
-        setPinError('Network error.');
-        setTimeout(() => { setPinValue(''); }, 600);
-      }
+      } catch (_) { setPinError('Network error.'); setTimeout(() => setPinValue(''), 600); }
     }
-  };
-
-  const handlePinDelete = () => {
-    setPinValue(prev => prev.slice(0, -1));
-    setPinError('');
   };
 
   const handleLogout = () => {
     setAuthToken('');
     localStorage.removeItem('servmanager_token');
-    if (isRemoteRoute) { setShowRemotePin(true); } else { setShowAuthModal(true); }
+    if (isRemoteRoute) setShowRemotePin(true); else setShowAuthModal(true);
   };
 
-  // Switch tabs
-  const handleNavClick = (targetView) => {
-    setView(targetView);
-  };
-
-  // Format uptime
-  const formatUptime = (seconds) => {
-    const days = Math.floor(seconds / (3600 * 24));
-    const hrs = Math.floor((seconds % (3600 * 24)) / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    return `${days > 0 ? days + 'd ' : ''}${hrs}h ${mins}m`;
-  };
-
-  // ----------------------------------------------------
-  // SUB-VIEWS RENDERING
-  // ----------------------------------------------------
-
-  // 1. Stats monitoring view
+  // ────────────────────────────────────────────────────────
+  // VIEW 1: SYSTEM STATS
+  // ────────────────────────────────────────────────────────
   const renderStatsView = () => {
-    const getDashOffset = (pct) => 251.2 - (pct / 100) * 251.2;
-
+    const offset = (pct) => 251.2 - (pct / 100) * 251.2;
     return (
       <div className="view-section">
         <div className="section-header">
           <h1 className="text-gradient">System Diagnostics</h1>
           <p>Real-time system resources and active network listening ports.</p>
         </div>
-
         <div className="stats-grid">
-          {/* CPU Card */}
-          <div className="glass-card stats-card">
-            <div className="card-title">
-              <h3>CPU Usage</h3>
-              <Icon name="cpu" className="icon-svg text-indigo" />
+          {[
+            { label: 'CPU Usage', pct: stats.cpu, cls: 'gauge-cpu', icon: 'cpu', iconCls: 'text-indigo', sub: 'Average Core Load' },
+            { label: 'RAM Memory', pct: stats.ram.pct, cls: 'gauge-ram', icon: 'database', iconCls: 'text-violet', sub: `${Math.round(stats.ram.used)} MB / ${Math.round(stats.ram.total)} MB` },
+            { label: 'Disk Storage', pct: stats.disk.pct, cls: 'gauge-disk', icon: 'server', iconCls: 'text-emerald', sub: `Used: ${stats.disk.used} / ${stats.disk.total}` },
+          ].map(({ label, pct, cls, icon, iconCls, sub }) => (
+            <div className="glass-card stats-card" key={label}>
+              <div className="card-title">
+                <h3>{label}</h3>
+                <Icon name={icon} className={`icon-svg ${iconCls}`} />
+              </div>
+              <div className="gauge-container">
+                <svg viewBox="0 0 100 100" className="gauge-svg">
+                  <circle className="gauge-bg" cx="50" cy="50" r="40"/>
+                  <circle className={`gauge-value ${cls}`} cx="50" cy="50" r="40" strokeDasharray="251.2" strokeDashoffset={offset(pct)}/>
+                </svg>
+                <div className="gauge-value-text">{Math.round(pct)}%</div>
+              </div>
+              <div className="card-details text-center"><span>{sub}</span></div>
             </div>
-            <div className="gauge-container">
-              <svg viewBox="0 0 100 100" className="gauge-svg">
-                <circle className="gauge-bg" cx="50" cy="50" r="40"></circle>
-                <circle className="gauge-value gauge-cpu" cx="50" cy="50" r="40" strokeDasharray="251.2" strokeDashoffset={getDashOffset(stats.cpu)}></circle>
-              </svg>
-              <div className="gauge-value-text">{Math.round(stats.cpu)}%</div>
-            </div>
-            <div className="card-details text-center">
-              <span>Average Core Load</span>
-            </div>
-          </div>
+          ))}
+        </div>
 
-          {/* RAM Card */}
-          <div className="glass-card stats-card">
-            <div className="card-title">
-              <h3>RAM Memory</h3>
-              <Icon name="database" className="icon-svg text-violet" />
-            </div>
-            <div className="gauge-container">
-              <svg viewBox="0 0 100 100" className="gauge-svg">
-                <circle className="gauge-bg" cx="50" cy="50" r="40"></circle>
-                <circle className="gauge-value gauge-ram" cx="50" cy="50" r="40" strokeDasharray="251.2" strokeDashoffset={getDashOffset(stats.ram.pct)}></circle>
-              </svg>
-              <div className="gauge-value-text">{Math.round(stats.ram.pct)}%</div>
-            </div>
-            <div className="card-details text-center">
-              <span>{Math.round(stats.ram.used)} MB / {Math.round(stats.ram.total)} MB</span>
-            </div>
+        <div className="stats-info-row">
+          <div className="glass-card info-chip">
+            <Icon name="server" /><span>{stats.hostname}</span>
           </div>
-
-          {/* Disk Card */}
-          <div className="glass-card stats-card">
-            <div className="card-title">
-              <h3>Disk Storage (Root)</h3>
-              <Icon name="server" className="icon-svg text-emerald" />
-            </div>
-            <div className="gauge-container">
-              <svg viewBox="0 0 100 100" className="gauge-svg">
-                <circle className="gauge-bg" cx="50" cy="50" r="40"></circle>
-                <circle className="gauge-value gauge-disk" cx="50" cy="50" r="40" strokeDasharray="251.2" strokeDashoffset={getDashOffset(stats.disk.pct)}></circle>
-              </svg>
-              <div className="gauge-value-text">{Math.round(stats.disk.pct)}%</div>
-            </div>
-            <div className="card-details text-center">
-              <span>Used: {stats.disk.used} / Total: {stats.disk.total}</span>
-            </div>
+          <div className="glass-card info-chip">
+            <Icon name="activity" /><span>Uptime: {formatUptime(stats.uptime)}</span>
+          </div>
+          <div className="glass-card info-chip">
+            <Icon name="info" /><span>{stats.platform || 'Unknown OS'}</span>
           </div>
         </div>
 
@@ -472,29 +551,19 @@ export default function App() {
           </div>
           <div className="table-container">
             <table className="ports-table">
-              <thead>
-                <tr>
-                  <th>Protocol</th>
-                  <th>Port</th>
-                  <th>IP Address</th>
-                  <th>State</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Protocol</th><th>Port</th><th>IP Address</th><th>State</th></tr></thead>
               <tbody>
-                {ports.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="text-center text-muted">Scanning active networks...</td>
-                  </tr>
-                ) : (
-                  ports.map((p, idx) => (
-                    <tr key={idx}>
+                {ports.length === 0
+                  ? <tr><td colSpan="4" className="text-center text-muted">Scanning active networks...</td></tr>
+                  : ports.map((p, i) => (
+                    <tr key={i}>
                       <td><span className={`badge ${p.proto === 'TCP' ? 'badge-info' : 'badge-warn'}`}>{p.proto}</span></td>
                       <td className="font-mono text-gradient" style={{ fontWeight: 600 }}>{p.port}</td>
                       <td className="font-mono">{p.address}</td>
                       <td><span className="badge badge-success">{p.state}</span></td>
                     </tr>
                   ))
-                )}
+                }
               </tbody>
             </table>
           </div>
@@ -503,168 +572,132 @@ export default function App() {
     );
   };
 
-  // 2. Scripts Manager View
-  const [editingScript, setEditingScript] = useState(null);
+  // ────────────────────────────────────────────────────────
+  // VIEW 2: SCRIPTS MANAGER
+  // ────────────────────────────────────────────────────────
   const [editorOpen, setEditorOpen] = useState(false);
-  const [editorForm, setEditorForm] = useState({
-    id: '', name: '', description: '', isButton: true, isIndicator: false, interval: 30, content: ''
-  });
+  const [editorForm, setEditorForm] = useState({ id: '', name: '', description: '', isButton: true, isIndicator: false, interval: 30, content: '' });
 
-  const openScriptEditor = (script = null) => {
-    if (script) {
-      setEditorForm({
-        id: script.id,
-        name: script.name,
-        description: script.description || '',
-        isButton: script.isButton,
-        isIndicator: script.isIndicator,
-        interval: script.interval || 30,
-        content: script.content || ''
-      });
+  const openScriptEditor = (s = null) => {
+    if (s) {
+      setEditorForm({ id: s.id, name: s.name, description: s.description || '', isButton: s.isButton, isIndicator: s.isIndicator, interval: s.interval || 30, content: s.content || '' });
     } else {
-      setEditorForm({
-        id: '',
-        name: '',
-        description: '',
-        isButton: true,
-        isIndicator: false,
-        interval: 30,
-        content: '#!/bin/bash\n# Write command line scripts here\necho "Checking server active configurations..."\nexit 0'
-      });
+      setEditorForm({ id: '', name: '', description: '', isButton: true, isIndicator: false, interval: 30, content: '#!/bin/bash\n# Write your script here\necho "Script started"\n\nexit 0' });
     }
     setEditorOpen(true);
   };
 
   const deleteScript = async (id, name) => {
-    if (confirm(`Are you sure you want to delete script "${name}"?`)) {
-      await apiCall(`/api/scripts/${id}`, 'DELETE');
-      fetchScripts();
-    }
+    if (!confirm(`Delete script "${name}"?`)) return;
+    await apiCall(`/api/scripts/${id}`, 'DELETE');
+    fetchScripts();
+    addToast(`Script "${name}" deleted`, 'info');
   };
 
   const handleScriptSubmit = async (e) => {
     e.preventDefault();
-    const payload = {
-      id: editorForm.id || null,
-      name: editorForm.name,
-      description: editorForm.description,
-      type: 'shell',
-      isButton: editorForm.isButton,
-      isIndicator: editorForm.isIndicator,
-      interval: parseInt(editorForm.interval) || 30,
-      content: editorForm.content
-    };
-    await apiCall('/api/scripts', 'POST', payload);
-    setEditorOpen(false);
-    fetchScripts();
+    try {
+      await apiCall('/api/scripts', 'POST', { ...editorForm, id: editorForm.id || null, type: 'shell', interval: parseInt(editorForm.interval) || 30 });
+      setEditorOpen(false);
+      fetchScripts();
+      addToast('Script saved successfully', 'success');
+    } catch (err) {
+      addToast('Failed to save script: ' + err.message, 'error');
+    }
   };
 
   const renderScriptsView = () => {
     const shellScripts = scripts.filter(s => s.type === 'shell');
-
     return (
       <div className="view-section">
         <div className="section-header-row">
           <div>
             <h1 className="text-gradient">Scripts Manager</h1>
-            <p>Upload, write, and run custom shell command lines.</p>
+            <p>Write, manage and execute custom shell scripts on your server.</p>
           </div>
           <button className="btn btn-primary" onClick={() => openScriptEditor()}>
             <Icon name="plus" /> New Script
           </button>
         </div>
-
         <div className="scripts-grid">
-          {shellScripts.length === 0 ? (
-            <div className="glass-card text-center text-muted" style={{ gridColumn: '1/-1' }}>No scripts created. Click "New Script" to write one.</div>
-          ) : (
-            shellScripts.map(s => {
-              const statusClass = s.lastStatus === 'success' ? 'success' : s.lastStatus === 'failure' ? 'danger' : 'inactive';
+          {shellScripts.length === 0
+            ? <div className="glass-card text-center text-muted" style={{ gridColumn: '1/-1', padding: '3rem' }}>No scripts yet. Click "New Script" to create one.</div>
+            : shellScripts.map(s => {
+              const sc = s.lastStatus === 'success' ? 'success' : s.lastStatus === 'failure' ? 'danger' : 'inactive';
               return (
                 <div className="glass-card script-card" key={s.id}>
                   <div className="script-header">
                     <div>
                       <h3>{s.name}</h3>
-                      <span className="badge badge-muted" style={{ fontSize: '0.65rem', marginTop: '0.25rem' }}>SHELL</span>
+                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem' }}>
+                        <span className="badge badge-muted" style={{ fontSize: '0.6rem' }}>SHELL</span>
+                        {s.isIndicator && <span className="badge badge-info" style={{ fontSize: '0.6rem' }}>INDICATOR</span>}
+                        {s.isButton && <span className="badge badge-warn" style={{ fontSize: '0.6rem' }}>BUTTON</span>}
+                      </div>
                     </div>
                     <div className="meta-status">
-                      <span className={`status-dot ${statusClass}`}></span>
-                      <span>{s.lastStatus ? s.lastStatus.toUpperCase() : 'NOT RUN'}</span>
+                      <span className={`status-dot ${sc}`}></span>
+                      <span style={{ fontSize: '0.8rem' }}>{s.lastStatus ? s.lastStatus.toUpperCase() : 'NOT RUN'}</span>
                     </div>
                   </div>
                   <p className="script-desc">{s.description || 'No description provided.'}</p>
+                  {s.lastOutput && <pre className="script-last-output">{s.lastOutput.slice(0, 120)}{s.lastOutput.length > 120 ? '...' : ''}</pre>}
                   <div className="script-meta">
-                    <span className="text-muted" style={{ fontSize: '0.8rem' }}>Interval: {s.isIndicator ? `${s.interval}s` : 'Manual'}</span>
+                    <span className="text-muted" style={{ fontSize: '0.78rem' }}>
+                      {s.isIndicator ? `Polls every ${s.interval}s` : 'Manual trigger'} · {s.lastRun ? new Date(s.lastRun).toLocaleTimeString() : 'Never run'}
+                    </span>
                     <div className="script-actions">
-                      <button className="btn btn-secondary btn-icon" onClick={() => openScriptEditor(s)} title="Edit Script">
-                        <Icon name="edit" />
-                      </button>
-                      <button className="btn btn-secondary btn-icon text-danger" onClick={() => deleteScript(s.id, s.name)} title="Delete Script">
-                        <Icon name="trash" />
-                      </button>
-                      <button className="btn btn-primary btn-icon" onClick={() => runScript(s)} title="Execute Script">
-                        <Icon name="play" />
-                      </button>
+                      <button className="btn btn-secondary btn-icon" onClick={() => openScriptEditor(s)} title="Edit"><Icon name="edit" /></button>
+                      <button className="btn btn-secondary btn-icon text-danger" onClick={() => deleteScript(s.id, s.name)} title="Delete"><Icon name="trash" /></button>
+                      <button className="btn btn-primary btn-icon" onClick={() => runScript(s)} title="Run"><Icon name="play" /></button>
                     </div>
                   </div>
                 </div>
               );
             })
-          )}
+          }
         </div>
 
         {editorOpen && (
           <div className="glass-card editor-card margin-top-lg">
             <div className="card-title-bar">
-              <h3>{editorForm.id ? 'Edit Script Settings' : 'Create New Script'}</h3>
-              <button className="btn btn-secondary btn-icon" onClick={() => setEditorOpen(false)}>&times;</button>
+              <h3>{editorForm.id ? 'Edit Script' : 'Create Script'}</h3>
+              <button className="btn btn-secondary btn-icon" onClick={() => setEditorOpen(false)}><Icon name="close" /></button>
             </div>
             <form onSubmit={handleScriptSubmit} className="editor-form">
               <div className="form-row">
                 <div className="form-group flex-2">
                   <label>Script Title</label>
-                  <input type="text" value={editorForm.name} required onChange={e => setEditorForm({...editorForm, name: e.target.value})} placeholder="e.g. Purge System Temp Caches" />
+                  <input type="text" required value={editorForm.name} onChange={e => setEditorForm({ ...editorForm, name: e.target.value })} placeholder="e.g. Purge System Temp Caches" />
                 </div>
                 <div className="form-group flex-1">
                   <label>Remote Options</label>
                   <div className="checkbox-row">
-                    <label className="checkbox-label">
-                      <input type="checkbox" checked={editorForm.isButton} onChange={e => setEditorForm({...editorForm, isButton: e.target.checked})} /> Button Trigger
-                    </label>
-                    <label className="checkbox-label">
-                      <input type="checkbox" checked={editorForm.isIndicator} onChange={e => setEditorForm({...editorForm, isIndicator: e.target.checked})} /> Status Badge
-                    </label>
+                    <label className="checkbox-label"><input type="checkbox" checked={editorForm.isButton} onChange={e => setEditorForm({ ...editorForm, isButton: e.target.checked })} /> Button</label>
+                    <label className="checkbox-label"><input type="checkbox" checked={editorForm.isIndicator} onChange={e => setEditorForm({ ...editorForm, isIndicator: e.target.checked })} /> Indicator</label>
                   </div>
                 </div>
               </div>
-
               <div className="form-group">
                 <label>Description</label>
-                <input type="text" value={editorForm.description} onChange={e => setEditorForm({...editorForm, description: e.target.value})} placeholder="Describe script output triggers..." />
+                <input type="text" value={editorForm.description} onChange={e => setEditorForm({ ...editorForm, description: e.target.value })} placeholder="What does this script do?" />
               </div>
-
               {editorForm.isIndicator && (
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Poll Scan Interval (seconds)</label>
-                    <input type="number" min="5" value={editorForm.interval} onChange={e => setEditorForm({...editorForm, interval: e.target.value})} />
-                  </div>
+                <div className="form-group" style={{ maxWidth: '200px' }}>
+                  <label>Poll Interval (seconds)</label>
+                  <input type="number" min="5" value={editorForm.interval} onChange={e => setEditorForm({ ...editorForm, interval: e.target.value })} />
                 </div>
               )}
-
               <div className="form-group">
                 <div className="editor-label-bar">
-                  <label>Shell Code</label>
-                  <span className="badge badge-muted">bash / sh / batch</span>
+                  <label>Shell Script</label>
+                  <span className="badge badge-muted">bash · sh · batch</span>
                 </div>
-                <textarea className="code-editor-area" required value={editorForm.content} onChange={e => setEditorForm({...editorForm, content: e.target.value})} placeholder="#!/bin/bash"></textarea>
+                <CodeEditor value={editorForm.content} onChange={v => setEditorForm({ ...editorForm, content: v })} minHeight="320px" />
               </div>
-
               <div className="form-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setEditorOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">
-                  <Icon name="save" /> Save Script
-                </button>
+                <button type="submit" className="btn btn-primary"><Icon name="save" /> Save Script</button>
               </div>
             </form>
           </div>
@@ -673,365 +706,252 @@ export default function App() {
     );
   };
 
-  // 3. Workflows Designer View
+  // ────────────────────────────────────────────────────────
+  // VIEW 3: WORKFLOWS DESIGNER
+  // ────────────────────────────────────────────────────────
   const [designerOpen, setDesignerOpen] = useState(false);
-  const [wfForm, setWfForm] = useState({
-    id: '', name: '', description: '', isButton: true, isIndicator: false, interval: 30, steps: []
-  });
+  const [wfForm, setWfForm] = useState({ id: '', name: '', description: '', isButton: true, isIndicator: false, interval: 30, steps: [] });
 
   const openWorkflowDesigner = (wf = null) => {
     if (wf) {
-      setWfForm({
-        id: wf.id,
-        name: wf.name,
-        description: wf.description || '',
-        isButton: wf.isButton,
-        isIndicator: wf.isIndicator,
-        interval: wf.interval || 30,
-        steps: wf.workflow?.steps || []
-      });
+      setWfForm({ id: wf.id, name: wf.name, description: wf.description || '', isButton: wf.isButton, isIndicator: wf.isIndicator, interval: wf.interval || 30, steps: wf.workflow?.steps || [] });
     } else {
-      setWfForm({
-        id: '',
-        name: '',
-        description: '',
-        isButton: true,
-        isIndicator: false,
-        interval: 30,
-        steps: []
-      });
+      setWfForm({ id: '', name: '', description: '', isButton: true, isIndicator: false, interval: 30, steps: [] });
     }
     setDesignerOpen(true);
   };
 
   const addWorkflowStep = (type) => {
-    const stepId = 'step_' + Date.now() + Math.random().toString(36).substr(2, 4);
-    let name = '';
-    let config = {};
+    const id = 'step_' + Date.now();
+    const defaults = {
+      command: { name: 'Run Command', config: { command: '#!/bin/bash\necho "Hello"' } },
+      check_port: { name: 'Check Port', config: { port: '80' } },
+      http_request: { name: 'HTTP Request', config: { url: 'http://localhost:8080/api/system/stats', method: 'GET', body: '' } },
+      conditional: { name: 'Condition Branch', config: { matchType: 'exitcode', value: '0', nextStepId: '', elseStepId: '' } },
+      delay: { name: 'Delay', config: { seconds: '2' } },
+      log: { name: 'Log Message', config: { message: 'Checkpoint reached.' } },
+    };
+    const d = defaults[type] || { name: type, config: {} };
+    setWfForm(prev => ({ ...prev, steps: [...prev.steps, { id, type, ...d }] }));
+  };
 
-    if (type === 'command') {
-      name = 'Run Subprocess';
-      config = { command: 'echo "hello"' };
-    } else if (type === 'check_port') {
-      name = 'Scan Socket Port';
-      config = { port: '80' };
-    } else if (type === 'http_request') {
-      name = 'Send Web Hook';
-      config = { url: 'http://localhost:8080/api/system/stats', method: 'GET', body: '' };
-    } else if (type === 'conditional') {
-      name = 'Logical Branch';
-      config = { matchType: 'exitcode', value: '0', nextStepId: '', elseStepId: '' };
-    } else if (type === 'delay') {
-      name = 'Delay Sleep';
-      config = { seconds: '2' };
-    } else if (type === 'log') {
-      name = 'Print Log';
-      config = { message: 'Workflow checkpoint passed.' };
-    }
-
-    setWfForm(prev => ({
-      ...prev,
-      steps: [...prev.steps, { id: stepId, type, name, config }]
-    }));
+  const updateStepField = (idx, field, val) => {
+    setWfForm(prev => {
+      const steps = [...prev.steps];
+      steps[idx] = { ...steps[idx], [field]: val };
+      return { ...prev, steps };
+    });
   };
 
   const updateStepConfig = (idx, key, val) => {
     setWfForm(prev => {
-      const stepsCopy = [...prev.steps];
-      stepsCopy[idx].config[key] = val;
-      return { ...prev, steps: stepsCopy };
+      const steps = [...prev.steps];
+      steps[idx] = { ...steps[idx], config: { ...steps[idx].config, [key]: val } };
+      return { ...prev, steps };
     });
   };
 
-  const removeWorkflowStep = (idx) => {
-    setWfForm(prev => ({
-      ...prev,
-      steps: prev.steps.filter((_, i) => i !== idx)
-    }));
-  };
+  const removeWorkflowStep = (idx) => setWfForm(prev => ({ ...prev, steps: prev.steps.filter((_, i) => i !== idx) }));
 
-  const moveWorkflowStep = (idx, direction) => {
+  const moveWorkflowStep = (idx, dir) => {
     setWfForm(prev => {
-      const stepsCopy = [...prev.steps];
-      if (direction === 'up' && idx > 0) {
-        const temp = stepsCopy[idx];
-        stepsCopy[idx] = stepsCopy[idx - 1];
-        stepsCopy[idx - 1] = temp;
-      } else if (direction === 'down' && idx < stepsCopy.length - 1) {
-        const temp = stepsCopy[idx];
-        stepsCopy[idx] = stepsCopy[idx + 1];
-        stepsCopy[idx + 1] = temp;
-      }
-      return { ...prev, steps: stepsCopy };
+      const s = [...prev.steps];
+      if (dir === 'up' && idx > 0) [s[idx], s[idx - 1]] = [s[idx - 1], s[idx]];
+      else if (dir === 'down' && idx < s.length - 1) [s[idx], s[idx + 1]] = [s[idx + 1], s[idx]];
+      return { ...prev, steps: s };
     });
   };
 
   const handleWorkflowSubmit = async () => {
-    if (!wfForm.name) {
-      alert('Workflow name is required');
-      return;
+    if (!wfForm.name) { addToast('Workflow name required', 'error'); return; }
+    try {
+      await apiCall('/api/scripts', 'POST', {
+        id: wfForm.id || null, name: wfForm.name, description: wfForm.description,
+        type: 'workflow', isButton: wfForm.isButton, isIndicator: wfForm.isIndicator,
+        interval: parseInt(wfForm.interval) || 30, workflow: { steps: wfForm.steps }
+      });
+      setDesignerOpen(false);
+      fetchScripts();
+      addToast('Workflow saved', 'success');
+    } catch (err) {
+      addToast('Save failed: ' + err.message, 'error');
     }
-    const payload = {
-      id: wfForm.id || null,
-      name: wfForm.name,
-      description: wfForm.description,
-      type: 'workflow',
-      isButton: wfForm.isButton,
-      isIndicator: wfForm.isIndicator,
-      interval: parseInt(wfForm.interval) || 30,
-      workflow: {
-        steps: wfForm.steps
-      }
-    };
-    await apiCall('/api/scripts', 'POST', payload);
-    setDesignerOpen(false);
-    fetchScripts();
   };
 
   const renderWorkflowsView = () => {
     const workflows = scripts.filter(s => s.type === 'workflow');
-
     return (
       <div className="view-section">
         <div className="section-header-row">
           <div>
             <h1 className="text-gradient">Workflows Manager</h1>
-            <p>Chain system shell executions and API web hooks sequentially.</p>
+            <p>Chain commands, HTTP hooks, port checks, and conditional logic.</p>
           </div>
           <button className="btn btn-primary" onClick={() => openWorkflowDesigner()}>
             <Icon name="plus" /> Create Workflow
           </button>
         </div>
-
         <div className="scripts-grid">
-          {workflows.length === 0 ? (
-            <div className="glass-card text-center text-muted" style={{ gridColumn: '1/-1' }}>No workflows configured. Click "Create Workflow" to configure.</div>
-          ) : (
-            workflows.map(w => {
-              const statusClass = w.lastStatus === 'success' ? 'success' : w.lastStatus === 'failure' ? 'danger' : 'inactive';
+          {workflows.length === 0
+            ? <div className="glass-card text-center text-muted" style={{ gridColumn: '1/-1', padding: '3rem' }}>No workflows. Click "Create Workflow" to build one.</div>
+            : workflows.map(w => {
+              const sc = w.lastStatus === 'success' ? 'success' : w.lastStatus === 'failure' ? 'danger' : 'inactive';
               return (
                 <div className="glass-card script-card" key={w.id}>
                   <div className="script-header">
                     <div>
                       <h3>{w.name}</h3>
-                      <span className="badge badge-muted" style={{ fontSize: '0.65rem', marginTop: '0.25rem' }}>WORKFLOW</span>
+                      <span className="badge badge-muted" style={{ fontSize: '0.6rem', marginTop: '0.3rem' }}>WORKFLOW · {w.workflow?.steps?.length || 0} STEPS</span>
                     </div>
                     <div className="meta-status">
-                      <span className={`status-dot ${statusClass}`}></span>
-                      <span>{w.lastStatus ? w.lastStatus.toUpperCase() : 'NOT RUN'}</span>
+                      <span className={`status-dot ${sc}`}></span>
+                      <span style={{ fontSize: '0.8rem' }}>{w.lastStatus ? w.lastStatus.toUpperCase() : 'NOT RUN'}</span>
                     </div>
                   </div>
-                  <p className="script-desc">{w.description || 'No description provided.'}</p>
+                  <p className="script-desc">{w.description || 'No description.'}</p>
+                  {w.workflow?.steps?.length > 0 && (
+                    <div className="workflow-step-preview">
+                      {w.workflow.steps.slice(0, 4).map((step, i) => (
+                        <span key={step.id} className="step-pill">
+                          <span className="step-num">{i + 1}</span>{step.name}
+                        </span>
+                      ))}
+                      {w.workflow.steps.length > 4 && <span className="step-pill step-more">+{w.workflow.steps.length - 4}</span>}
+                    </div>
+                  )}
                   <div className="script-meta">
-                    <span className="text-muted" style={{ fontSize: '0.8rem' }}>Steps: {w.workflow?.steps?.length || 0}</span>
+                    <span className="text-muted" style={{ fontSize: '0.78rem' }}>{w.lastRun ? new Date(w.lastRun).toLocaleTimeString() : 'Never run'}</span>
                     <div className="script-actions">
-                      <button className="btn btn-secondary btn-icon" onClick={() => openWorkflowDesigner(w)} title="Edit Workflow">
-                        <Icon name="edit" />
-                      </button>
-                      <button className="btn btn-secondary btn-icon text-danger" onClick={() => deleteScript(w.id, w.name)} title="Delete Workflow">
-                        <Icon name="trash" />
-                      </button>
-                      <button className="btn btn-primary btn-icon" onClick={() => runScript(w)} title="Execute Workflow">
-                        <Icon name="play" />
-                      </button>
+                      <button className="btn btn-secondary btn-icon" onClick={() => openWorkflowDesigner(w)} title="Edit"><Icon name="edit" /></button>
+                      <button className="btn btn-secondary btn-icon text-danger" onClick={() => deleteScript(w.id, w.name)} title="Delete"><Icon name="trash" /></button>
+                      <button className="btn btn-primary btn-icon" onClick={() => runScript(w)} title="Run"><Icon name="play" /></button>
                     </div>
                   </div>
                 </div>
               );
             })
-          )}
+          }
         </div>
 
         {designerOpen && (
           <div className="workflow-designer-wrap margin-top-lg">
             <div className="glass-card workflow-designer-card">
               <div className="card-title-bar">
-                <h3>{wfForm.id ? 'Modify Workflow Steps' : 'Assemble Workflow'}</h3>
-                <button className="btn btn-secondary btn-icon" onClick={() => setDesignerOpen(false)}>&times;</button>
+                <h3>{wfForm.id ? 'Edit Workflow' : 'New Workflow'}</h3>
+                <button className="btn btn-secondary btn-icon" onClick={() => setDesignerOpen(false)}><Icon name="close" /></button>
               </div>
-
               <div className="editor-form-meta">
                 <div className="form-row">
                   <div className="form-group flex-2">
                     <label>Workflow Name</label>
-                    <input type="text" value={wfForm.name} required onChange={e => setWfForm({...wfForm, name: e.target.value})} placeholder="e.g. Core Web Server Health poller" />
+                    <input type="text" value={wfForm.name} onChange={e => setWfForm({ ...wfForm, name: e.target.value })} placeholder="e.g. Deploy Nginx Stack" />
                   </div>
                   <div className="form-group flex-1">
+                    <label>Options</label>
                     <div className="checkbox-row double-spacing">
-                      <label className="checkbox-label">
-                        <input type="checkbox" checked={wfForm.isButton} onChange={e => setWfForm({...wfForm, isButton: e.target.checked})} /> Remote Button
-                      </label>
-                      <label className="checkbox-label">
-                        <input type="checkbox" checked={wfForm.isIndicator} onChange={e => setWfForm({...wfForm, isIndicator: e.target.checked})} /> Health Indicator
-                      </label>
+                      <label className="checkbox-label"><input type="checkbox" checked={wfForm.isButton} onChange={e => setWfForm({ ...wfForm, isButton: e.target.checked })} /> Remote Button</label>
+                      <label className="checkbox-label"><input type="checkbox" checked={wfForm.isIndicator} onChange={e => setWfForm({ ...wfForm, isIndicator: e.target.checked })} /> Health Indicator</label>
                     </div>
                   </div>
                 </div>
                 <div className="form-row">
                   <div className="form-group flex-2">
                     <label>Description</label>
-                    <input type="text" value={wfForm.description} onChange={e => setWfForm({...wfForm, description: e.target.value})} placeholder="Describe execution sequences..." />
+                    <input type="text" value={wfForm.description} onChange={e => setWfForm({ ...wfForm, description: e.target.value })} placeholder="Describe what this workflow does..." />
                   </div>
                   {wfForm.isIndicator && (
                     <div className="form-group flex-1">
-                      <label>Background Poller Timer (s)</label>
-                      <input type="number" min="5" value={wfForm.interval} onChange={e => setWfForm({...wfForm, interval: e.target.value})} />
+                      <label>Poll Interval (s)</label>
+                      <input type="number" min="5" value={wfForm.interval} onChange={e => setWfForm({ ...wfForm, interval: e.target.value })} />
                     </div>
                   )}
                 </div>
               </div>
 
               <div className="designer-workspace">
-                {/* Available library steps */}
                 <div className="blocks-library">
                   <h4>Step Blocks</h4>
-                  <p className="library-subtitle">Click to add steps to workflow canvas:</p>
+                  <p className="library-subtitle">Click to add to workflow:</p>
                   <div className="library-blocks-list">
-                    <button className="btn btn-secondary lib-block-btn" onClick={() => addWorkflowStep('command')}>
-                      <Icon name="terminal" /> Command Exec
-                    </button>
-                    <button className="btn btn-secondary lib-block-btn" onClick={() => addWorkflowStep('check_port')}>
-                      <Icon name="stats" /> Scan Port
-                    </button>
-                    <button className="btn btn-secondary lib-block-btn" onClick={() => addWorkflowStep('http_request')}>
-                      <Icon name="external-link" /> Send API Call
-                    </button>
-                    <button className="btn btn-secondary lib-block-btn" onClick={() => addWorkflowStep('conditional')}>
-                      <Icon name="flow" /> Condition Jump
-                    </button>
-                    <button className="btn btn-secondary lib-block-btn" onClick={() => addWorkflowStep('delay')}>
-                      <Icon name="refresh" /> Delay Sleep
-                    </button>
-                    <button className="btn btn-secondary lib-block-btn" onClick={() => addWorkflowStep('log')}>
-                      <Icon name="info" /> Print Log Msg
-                    </button>
+                    {[
+                      ['command', 'terminal', 'Run Command'],
+                      ['check_port', 'stats', 'Check Port'],
+                      ['http_request', 'external-link', 'HTTP Request'],
+                      ['conditional', 'flow', 'Condition'],
+                      ['delay', 'refresh', 'Delay'],
+                      ['log', 'info', 'Log Message'],
+                    ].map(([type, icon, label]) => (
+                      <button key={type} className="btn btn-secondary lib-block-btn" onClick={() => addWorkflowStep(type)}>
+                        <Icon name={icon} /> {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Canvas Workspace */}
                 <div className="canvas-panel">
                   <div className="canvas-header">
-                    <h4>Workflow Execution Sequence</h4>
+                    <h4>Execution Sequence</h4>
                     <span className="badge badge-muted">{wfForm.steps.length} Steps</span>
                   </div>
                   <div className="canvas-steps">
-                    {wfForm.steps.length === 0 ? (
-                      <div className="canvas-placeholder">
-                        <Icon name="flow" />
-                        <p>No active steps selected. Choose block options from the left library.</p>
-                      </div>
-                    ) : (
-                      wfForm.steps.map((step, idx) => {
-                        let stepConfigHtml = null;
-
+                    {wfForm.steps.length === 0
+                      ? <div className="canvas-placeholder"><Icon name="flow" /><p>Add steps from the left panel.</p></div>
+                      : wfForm.steps.map((step, idx) => {
+                        let cfg = null;
                         if (step.type === 'command') {
-                          stepConfigHtml = (
+                          cfg = (
                             <div className="step-input-group">
-                              <label>Shell Command</label>
-                              <input type="text" value={step.config.command || ''} onChange={e => updateStepConfig(idx, 'command', e.target.value)} />
+                              <label>Shell Command / Script</label>
+                              <CodeEditor value={step.config.command || ''} onChange={v => updateStepConfig(idx, 'command', v)} minHeight="120px" placeholder="#!/bin/bash&#10;echo hello" />
                             </div>
                           );
                         } else if (step.type === 'check_port') {
-                          stepConfigHtml = (
-                            <div className="step-input-group">
-                              <label>Port (TCP)</label>
-                              <input type="number" value={step.config.port || ''} onChange={e => updateStepConfig(idx, 'port', e.target.value)} />
-                            </div>
-                          );
+                          cfg = <div className="step-input-group"><label>TCP Port</label><input type="number" value={step.config.port || ''} onChange={e => updateStepConfig(idx, 'port', e.target.value)} /></div>;
                         } else if (step.type === 'http_request') {
-                          stepConfigHtml = (
-                            <>
-                              <div className="step-input-group flex-2">
-                                <label>Target URL</label>
-                                <input type="text" value={step.config.url || ''} onChange={e => updateStepConfig(idx, 'url', e.target.value)} />
-                              </div>
-                              <div className="step-input-group flex-1">
-                                <label>Method</label>
-                                <select value={step.config.method || 'GET'} onChange={e => updateStepConfig(idx, 'method', e.target.value)}>
-                                  <option value="GET">GET</option>
-                                  <option value="POST">POST</option>
-                                </select>
-                              </div>
-                            </>
-                          );
+                          cfg = <>
+                            <div className="step-input-group flex-2"><label>URL</label><input type="text" value={step.config.url || ''} onChange={e => updateStepConfig(idx, 'url', e.target.value)} /></div>
+                            <div className="step-input-group flex-1"><label>Method</label><select value={step.config.method || 'GET'} onChange={e => updateStepConfig(idx, 'method', e.target.value)}><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select></div>
+                            <div className="step-input-group"><label>Body (optional JSON)</label><textarea rows={2} value={step.config.body || ''} onChange={e => updateStepConfig(idx, 'body', e.target.value)} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem' }} /></div>
+                          </>;
                         } else if (step.type === 'delay') {
-                          stepConfigHtml = (
-                            <div className="step-input-group">
-                              <label>Duration (Seconds)</label>
-                              <input type="number" value={step.config.seconds || '1'} onChange={e => updateStepConfig(idx, 'seconds', e.target.value)} />
-                            </div>
-                          );
+                          cfg = <div className="step-input-group"><label>Seconds</label><input type="number" min="0.1" step="0.1" value={step.config.seconds || '1'} onChange={e => updateStepConfig(idx, 'seconds', e.target.value)} /></div>;
                         } else if (step.type === 'log') {
-                          stepConfigHtml = (
-                            <div className="step-input-group">
-                              <label>Message Content</label>
-                              <input type="text" value={step.config.message || ''} onChange={e => updateStepConfig(idx, 'message', e.target.value)} />
-                            </div>
-                          );
+                          cfg = <div className="step-input-group"><label>Message</label><input type="text" value={step.config.message || ''} onChange={e => updateStepConfig(idx, 'message', e.target.value)} /></div>;
                         } else if (step.type === 'conditional') {
-                          const otherSteps = wfForm.steps.filter((_, i) => i !== idx);
-                          stepConfigHtml = (
-                            <>
-                              <div className="step-input-group">
-                                <label>Comparison Method</label>
-                                <select value={step.config.matchType || 'exitcode'} onChange={e => updateStepConfig(idx, 'matchType', e.target.value)}>
-                                  <option value="exitcode">Last Exit Code</option>
-                                  <option value="contains">Output Contains</option>
-                                  <option value="equals">Output Equals</option>
-                                </select>
-                              </div>
-                              <div className="step-input-group">
-                                <label>Value Match</label>
-                                <input type="text" value={step.config.value || ''} onChange={e => updateStepConfig(idx, 'value', e.target.value)} />
-                              </div>
-                              <div className="step-input-group">
-                                <label>If True, Jump To</label>
-                                <select value={step.config.nextStepId || ''} onChange={e => updateStepConfig(idx, 'nextStepId', e.target.value)}>
-                                  <option value="">-- Continue --</option>
-                                  {otherSteps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
-                              </div>
-                              <div className="step-input-group">
-                                <label>Else, Jump To</label>
-                                <select value={step.config.elseStepId || ''} onChange={e => updateStepConfig(idx, 'elseStepId', e.target.value)}>
-                                  <option value="">-- Continue --</option>
-                                  {otherSteps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
-                              </div>
-                            </>
-                          );
+                          const others = wfForm.steps.filter((_, i) => i !== idx);
+                          cfg = <>
+                            <div className="step-input-group"><label>Compare</label><select value={step.config.matchType || 'exitcode'} onChange={e => updateStepConfig(idx, 'matchType', e.target.value)}><option value="exitcode">Last Exit Code</option><option value="contains">Output Contains</option><option value="equals">Output Equals</option></select></div>
+                            <div className="step-input-group"><label>Value</label><input type="text" value={step.config.value || ''} onChange={e => updateStepConfig(idx, 'value', e.target.value)} /></div>
+                            <div className="step-input-group"><label>If True → Jump To</label><select value={step.config.nextStepId || ''} onChange={e => updateStepConfig(idx, 'nextStepId', e.target.value)}><option value="">— Continue —</option>{others.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                            <div className="step-input-group"><label>Else → Jump To</label><select value={step.config.elseStepId || ''} onChange={e => updateStepConfig(idx, 'elseStepId', e.target.value)}><option value="">— Continue —</option>{others.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                          </>;
                         }
-
                         return (
                           <div className="workflow-step-block" key={step.id}>
                             <div className="step-block-header">
                               <div className="step-block-title">
                                 <span className="badge badge-info">{idx + 1}</span>
-                                <span>{step.name}</span>
-                                <small className="text-muted">({step.type.toUpperCase()})</small>
+                                <input className="step-name-input" value={step.name} onChange={e => updateStepField(idx, 'name', e.target.value)} />
+                                <small className="text-muted">({step.type})</small>
                               </div>
                               <div className="script-actions">
-                                <button className="btn btn-secondary btn-icon" style={{ height: 30, width: 30 }} onClick={() => moveWorkflowStep(idx, 'up')}>&uarr;</button>
-                                <button className="btn btn-secondary btn-icon" style={{ height: 30, width: 30 }} onClick={() => moveWorkflowStep(idx, 'down')}>&darr;</button>
-                                <button className="btn btn-secondary btn-icon text-danger" style={{ height: 30, width: 30 }} onClick={() => removeWorkflowStep(idx)}>&times;</button>
+                                <button className="btn btn-secondary btn-icon sm" onClick={() => moveWorkflowStep(idx, 'up')}>↑</button>
+                                <button className="btn btn-secondary btn-icon sm" onClick={() => moveWorkflowStep(idx, 'down')}>↓</button>
+                                <button className="btn btn-secondary btn-icon sm text-danger" onClick={() => removeWorkflowStep(idx)}><Icon name="close" /></button>
                               </div>
                             </div>
-                            <div className="step-block-config">
-                              {stepConfigHtml}
-                            </div>
+                            <div className="step-block-config">{cfg}</div>
                           </div>
                         );
                       })
-                    )}
+                    }
                   </div>
                 </div>
               </div>
 
               <div className="form-actions border-top">
-                <button type="button" className="btn btn-secondary" onClick={() => setDesignerOpen(false)}>Cancel</button>
-                <button type="button" className="btn btn-primary" onClick={handleWorkflowSubmit}>
-                  <Icon name="save" /> Save Workflow
-                </button>
+                <button className="btn btn-secondary" onClick={() => setDesignerOpen(false)}>Cancel</button>
+                <button className="btn btn-primary" onClick={handleWorkflowSubmit}><Icon name="save" /> Save Workflow</button>
               </div>
             </div>
           </div>
@@ -1040,413 +960,464 @@ export default function App() {
     );
   };
 
-  // 4. Remote Designer View
+  // ────────────────────────────────────────────────────────
+  // VIEW 4: REMOTE DESIGNER
+  // ────────────────────────────────────────────────────────
   const [widgetForm, setWidgetForm] = useState({
-    title: '', type: 'button', scriptId: '', metricType: 'cpu', size: 'small', color: 'indigo', icon: 'terminal'
+    title: '', description: '', type: 'button', scriptId: '', sshConnectionId: '',
+    metricType: 'cpu', size: 'small', color: 'indigo', icon: 'terminal'
   });
+
+  const COLORS = ['indigo', 'violet', 'emerald', 'amber', 'rose', 'cyan', 'orange'];
+  const ICONS = [
+    ['terminal', 'Terminal'], ['activity', 'Activity'], ['cpu', 'CPU'], ['database', 'Database'],
+    ['server', 'Server'], ['heart-rate', 'ECG'], ['refresh', 'Sync'], ['shield', 'Shield'],
+    ['wifi', 'Network'], ['ssh', 'SSH'], ['key', 'Key'], ['stats', 'Stats'],
+  ];
 
   const handleWidgetAdd = (e) => {
     e.preventDefault();
-    const bindingScript = scripts.find(s => s.id === widgetForm.scriptId);
-    
     const newWidget = {
       id: 'widget_' + Date.now(),
       title: widgetForm.title,
+      description: widgetForm.description,
       type: widgetForm.type,
-      scriptId: widgetForm.type !== 'metric' ? (widgetForm.scriptId || (scripts[0]?.id || '')) : null,
+      scriptId: (widgetForm.type === 'button' || widgetForm.type === 'indicator') ? (widgetForm.scriptId || '') : null,
+      sshConnectionId: widgetForm.type === 'ssh' ? widgetForm.sshConnectionId : null,
       metricType: widgetForm.type === 'metric' ? widgetForm.metricType : null,
       size: widgetForm.size,
       color: widgetForm.color,
       icon: widgetForm.icon,
-      position: remoteWidgets.length
+      position: remoteWidgets.length,
     };
-
     setRemoteWidgets(prev => [...prev, newWidget]);
-    // Reset form title
-    setWidgetForm({ ...widgetForm, title: '' });
+    setWidgetForm({ ...widgetForm, title: '', description: '' });
   };
 
-  const removeWidgetFromGrid = (id) => {
-    setRemoteWidgets(prev => prev.filter(w => w.id !== id).map((w, idx) => ({ ...w, position: idx })));
-  };
+  const removeWidgetFromGrid = (id) => setRemoteWidgets(prev => prev.filter(w => w.id !== id).map((w, i) => ({ ...w, position: i })));
 
   const saveRemoteLayout = async () => {
     try {
       await apiCall('/api/remote/config', 'POST', { widgets: remoteWidgets });
-      alert('Remote layout settings updated.');
+      const info = await apiCall('/api/system/info');
+      setRemoteUrl(info.remoteUrl || `${window.location.origin}/remote`);
+      setShowQR(true);
+      addToast('Remote layout saved!', 'success');
     } catch (e) {
-      alert('Failed to save layout configuration: ' + e.message);
+      addToast('Save failed: ' + e.message, 'error');
     }
   };
 
-  // Drag-and-drop handlers for Remote Designer
-  const handleDragStart = (e, id) => {
-    dragItem.current = id;
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e, id) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (id !== dragItem.current) setDragOverId(id);
-  };
-
+  const handleDragStart = (e, id) => { dragItem.current = id; e.dataTransfer.effectAllowed = 'move'; };
+  const handleDragOver = (e, id) => { e.preventDefault(); if (id !== dragItem.current) setDragOverId(id); };
   const handleDrop = (e, targetId) => {
-    e.preventDefault();
-    setDragOverId(null);
+    e.preventDefault(); setDragOverId(null);
     if (!dragItem.current || dragItem.current === targetId) return;
     setRemoteWidgets(prev => {
       const sorted = [...prev].sort((a, b) => a.position - b.position);
-      const fromIdx = sorted.findIndex(w => w.id === dragItem.current);
-      const toIdx = sorted.findIndex(w => w.id === targetId);
-      if (fromIdx === -1 || toIdx === -1) return prev;
-      const moved = sorted.splice(fromIdx, 1)[0];
-      sorted.splice(toIdx, 0, moved);
+      const fi = sorted.findIndex(w => w.id === dragItem.current);
+      const ti = sorted.findIndex(w => w.id === targetId);
+      if (fi === -1 || ti === -1) return prev;
+      const [moved] = sorted.splice(fi, 1);
+      sorted.splice(ti, 0, moved);
       return sorted.map((w, i) => ({ ...w, position: i }));
     });
     dragItem.current = null;
   };
+  const handleDragEnd = () => { setDragOverId(null); dragItem.current = null; };
 
-  const handleDragEnd = () => {
-    setDragOverId(null);
-    dragItem.current = null;
-  };
+  const boundScripts = scripts.filter(s => s.isButton || s.isIndicator);
 
-  const renderRemoteDesigner = () => {
-    const boundScripts = scripts.filter(s => s.isButton || s.isIndicator);
-    
-    return (
-      <div className="view-section">
-        <div className="section-header-row">
-          <div>
-            <h1 className="text-gradient">Remote Dashboard Designer</h1>
-            <p>Configure custom layouts, actions, and status widgets for tablet control pads.</p>
+  const renderRemoteDesigner = () => (
+    <div className="view-section">
+      <div className="section-header-row">
+        <div>
+          <h1 className="text-gradient">Remote Dashboard Designer</h1>
+          <p>Build your mobile control panel — add widgets, drag to reorder, tap to configure.</p>
+        </div>
+        <div className="designer-actions">
+          <a href="/remote" target="_blank" className="btn btn-secondary"><Icon name="external-link" /> Open Remote</a>
+          <button className="btn btn-primary" onClick={saveRemoteLayout}><Icon name="save" /> Save & Get QR</button>
+        </div>
+      </div>
+
+      {showQR && remoteUrl && (
+        <div className="glass-card qr-panel margin-top-lg">
+          <div className="card-title-bar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Icon name="qrcode" />
+              <h4>Scan to Open Mobile Remote</h4>
+            </div>
+            <button className="btn btn-secondary btn-icon" onClick={() => setShowQR(false)}><Icon name="close" /></button>
           </div>
-          <div className="designer-actions">
-            <a href="/remote" target="_blank" className="btn btn-secondary">
-              <Icon name="external-link" /> Open Remote Pad
-            </a>
-            <button className="btn btn-primary" onClick={saveRemoteLayout}>
-              <Icon name="save" /> Save Layout Config
-            </button>
+          <div className="qr-container">
+            <div className="qr-code-wrap">
+              <QRCodeSVG value={remoteUrl} size={180} level="H" fgColor="var(--primary)" bgColor="transparent" />
+            </div>
+            <div className="qr-info">
+              <p className="text-muted" style={{ marginBottom: '0.5rem' }}>Point your phone's camera at this code to open the remote panel.</p>
+              <div className="copy-input-row">
+                <input type="text" readOnly value={remoteUrl} className="font-mono" style={{ fontSize: '0.82rem' }} />
+                <button className="btn btn-secondary btn-icon" onClick={() => { navigator.clipboard.writeText(remoteUrl); addToast('URL copied!', 'success'); }}><Icon name="copy" /></button>
+              </div>
+              <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>PIN required to unlock. Set it in Settings.</p>
+            </div>
           </div>
         </div>
+      )}
 
-        <div className="designer-layout-container">
-          {/* Add widget form panel */}
-          <div className="glass-card remote-library-panel">
-            <h4>Layout Block Library</h4>
-            <p className="library-subtitle">Append active nodes directly into the touch remote dashboard:</p>
+      <div className="designer-layout-container">
+        <div className="glass-card remote-library-panel">
+          <h4>Add Widget</h4>
+          <form onSubmit={handleWidgetAdd} className="editor-form no-margin">
+            <div className="form-group">
+              <label>Widget Label</label>
+              <input type="text" required value={widgetForm.title} onChange={e => setWidgetForm({ ...widgetForm, title: e.target.value })} placeholder="e.g. Restart Nginx" />
+            </div>
+            <div className="form-group">
+              <label>Subtitle / Description</label>
+              <input type="text" value={widgetForm.description} onChange={e => setWidgetForm({ ...widgetForm, description: e.target.value })} placeholder="Short description shown on tile" />
+            </div>
+            <div className="form-group">
+              <label>Widget Type</label>
+              <select value={widgetForm.type} onChange={e => setWidgetForm({ ...widgetForm, type: e.target.value })}>
+                <option value="button">Action Button</option>
+                <option value="indicator">Health Indicator</option>
+                <option value="metric">System Metric</option>
+                <option value="ssh">SSH Terminal</option>
+              </select>
+            </div>
 
-            <form onSubmit={handleWidgetAdd} className="editor-form no-margin">
+            {(widgetForm.type === 'button' || widgetForm.type === 'indicator') && (
               <div className="form-group">
-                <label>Widget Label</label>
-                <input type="text" required value={widgetForm.title} onChange={e => setWidgetForm({...widgetForm, title: e.target.value})} placeholder="e.g. Reboot Apache Service" />
-              </div>
-
-              <div className="form-group">
-                <label>Widget Type</label>
-                <select value={widgetForm.type} onChange={e => setWidgetForm({...widgetForm, type: e.target.value})}>
-                  <option value="button">Action Command Trigger</option>
-                  <option value="indicator">Health Status Ring</option>
-                  <option value="metric">System Live resource</option>
+                <label>Bind Script / Workflow</label>
+                <select value={widgetForm.scriptId} onChange={e => setWidgetForm({ ...widgetForm, scriptId: e.target.value })}>
+                  <option value="">— Select —</option>
+                  {boundScripts.map(s => <option key={s.id} value={s.id}>{s.name} ({s.type})</option>)}
                 </select>
               </div>
+            )}
 
-              {widgetForm.type !== 'metric' ? (
-                <div className="form-group">
-                  <label>Bind to Script Action</label>
-                  <select value={widgetForm.scriptId} onChange={e => setWidgetForm({...widgetForm, scriptId: e.target.value})}>
-                    <option value="">-- Choose Script/Workflow --</option>
-                    {boundScripts.map(s => <option key={s.id} value={s.id}>{s.name} ({s.type.toUpperCase()})</option>)}
-                  </select>
-                </div>
-              ) : (
-                <div className="form-group">
-                  <label>Hardware Metric Type</label>
-                  <select value={widgetForm.metricType} onChange={e => setWidgetForm({...widgetForm, metricType: e.target.value})}>
-                    <option value="cpu">CPU Usage (%)</option>
-                    <option value="ram">RAM Memory (%)</option>
-                    <option value="disk">Root Disk (%)</option>
-                    <option value="uptime">System Uptime</option>
-                  </select>
-                </div>
-              )}
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Touch Grid Size</label>
-                  <select value={widgetForm.size} onChange={e => setWidgetForm({...widgetForm, size: e.target.value})}>
-                    <option value="small">Small (1x1)</option>
-                    <option value="medium">Medium (2x1)</option>
-                    <option value="large">Large (2x2)</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Color Accent</label>
-                  <select value={widgetForm.color} onChange={e => setWidgetForm({...widgetForm, color: e.target.value})}>
-                    <option value="indigo">Indigo (Primary)</option>
-                    <option value="violet">Violet</option>
-                    <option value="emerald">Emerald</option>
-                    <option value="amber">Amber</option>
-                    <option value="rose">Rose</option>
-                  </select>
-                </div>
-              </div>
-
+            {widgetForm.type === 'metric' && (
               <div className="form-group">
-                <label>Widget Graphic Icon</label>
-                <select value={widgetForm.icon} onChange={e => setWidgetForm({...widgetForm, icon: e.target.value})}>
-                  <option value="terminal">Terminal Prompt</option>
-                  <option value="activity">Heartpulse</option>
-                  <option value="cpu">CPU Chip</option>
-                  <option value="database">RAM Grid</option>
-                  <option value="server">Server Disk</option>
-                  <option value="heart-rate">ECG Line</option>
-                  <option value="refresh">Sync Loop</option>
+                <label>Metric</label>
+                <select value={widgetForm.metricType} onChange={e => setWidgetForm({ ...widgetForm, metricType: e.target.value })}>
+                  <option value="cpu">CPU Usage</option>
+                  <option value="ram">RAM Memory</option>
+                  <option value="disk">Disk Usage</option>
+                  <option value="uptime">Uptime</option>
                 </select>
               </div>
+            )}
 
-              <button type="submit" className="btn btn-primary width-100">
-                <Icon name="plus" /> Add Widget Block
-              </button>
-            </form>
+            {widgetForm.type === 'ssh' && (
+              <div className="form-group">
+                <label>SSH Connection</label>
+                <select value={widgetForm.sshConnectionId} onChange={e => setWidgetForm({ ...widgetForm, sshConnectionId: e.target.value })}>
+                  <option value="">— Select Connection —</option>
+                  {sshConnections.map(c => <option key={c.id} value={c.id}>{c.name} ({c.username}@{c.host})</option>)}
+                </select>
+                {sshConnections.length === 0 && <small className="text-muted">No connections. Add them in SSH Connections view.</small>}
+              </div>
+            )}
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Size</label>
+                <select value={widgetForm.size} onChange={e => setWidgetForm({ ...widgetForm, size: e.target.value })}>
+                  <option value="small">Small (1×1)</option>
+                  <option value="medium">Medium (2×1)</option>
+                  <option value="large">Large (2×2)</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Color</label>
+                <select value={widgetForm.color} onChange={e => setWidgetForm({ ...widgetForm, color: e.target.value })}>
+                  {COLORS.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Icon</label>
+              <div className="icon-picker">
+                {ICONS.map(([name, label]) => (
+                  <button key={name} type="button" title={label}
+                    className={`icon-pick-btn ${widgetForm.icon === name ? 'selected' : ''}`}
+                    onClick={() => setWidgetForm({ ...widgetForm, icon: name })}>
+                    <Icon name={name} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+              <Icon name="plus" /> Add to Remote
+            </button>
+          </form>
+        </div>
+
+        <div className="glass-card remote-canvas-panel">
+          <div className="canvas-header">
+            <h4>Remote Preview</h4>
+            <span className="badge badge-muted">{remoteWidgets.length} widgets</span>
           </div>
-
-          {/* Interactive grid preview */}
-          <div className="glass-card remote-canvas-panel">
-            <div className="canvas-header">
-              <h4>Remote Interface Mockup (Grid)</h4>
-              <span className="badge badge-info">Preview Mode</span>
-            </div>
-
-            <div className="remote-preview-grid">
-              {remoteWidgets.length === 0 ? (
-                <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)' }}>
-                  Preview canvas is empty. Add blocks from the library.
-                </div>
-              ) : (
-                [...remoteWidgets].sort((a,b) => a.position - b.position).map(w => (
-                  <div
-                    key={w.id}
-                    className={`preview-widget size-${w.size} accent-${w.color}${dragOverId === w.id ? ' drag-over' : ''}${dragItem.current === w.id ? ' dragging' : ''}`}
-                    draggable
-                    onDragStart={e => handleDragStart(e, w.id)}
-                    onDragOver={e => handleDragOver(e, w.id)}
-                    onDrop={e => handleDrop(e, w.id)}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <div className="widget-drag-handle" title="Drag to reorder">
-                      <Icon name="move" className="icon-svg" style={{ width: '14px', height: '14px' }} />
-                    </div>
-                    <div className="widget-preview-actions">
-                      <button className="btn-remove-widget" onClick={() => removeWidgetFromGrid(w.id)}>&times;</button>
-                    </div>
-                    <div style={{ fontSize: '1.5rem', opacity: 0.8 }}>
-                      <Icon name={w.icon} />
-                    </div>
-                    <div className="widget-label">{w.title}</div>
-                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                      {w.type === 'metric' ? `Metric: ${w.metricType.toUpperCase()}` : w.type.toUpperCase()}
-                    </div>
+          <div className="remote-preview-grid">
+            {remoteWidgets.length === 0
+              ? <div style={{ gridColumn: '1/-1', textAlign: 'center', color: 'var(--text-dim)', padding: '3rem' }}>Preview empty. Add widgets from the left panel.</div>
+              : [...remoteWidgets].sort((a, b) => a.position - b.position).map(w => (
+                <div key={w.id}
+                  className={`preview-widget size-${w.size} accent-${w.color}${dragOverId === w.id ? ' drag-over' : ''}${dragItem.current === w.id ? ' dragging' : ''}`}
+                  draggable onDragStart={e => handleDragStart(e, w.id)} onDragOver={e => handleDragOver(e, w.id)}
+                  onDrop={e => handleDrop(e, w.id)} onDragEnd={handleDragEnd}>
+                  <div className="widget-preview-actions">
+                    <button className="btn-remove-widget" onClick={() => removeWidgetFromGrid(w.id)}>&times;</button>
                   </div>
-                ))
-              )}
-            </div>
+                  <Icon name={w.icon} />
+                  <div className="widget-label">{w.title}</div>
+                  <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                    {w.type === 'metric' ? w.metricType : w.type === 'ssh' ? 'SSH' : w.type.toUpperCase()}
+                  </div>
+                </div>
+              ))
+            }
           </div>
         </div>
       </div>
-    );
+    </div>
+  );
+
+  // ────────────────────────────────────────────────────────
+  // VIEW 5: SSH CONNECTIONS MANAGER
+  // ────────────────────────────────────────────────────────
+  const [sshConnForm, setSshConnForm] = useState({ id: '', name: '', host: '', port: 22, username: '', password: '' });
+  const [sshConnEditorOpen, setSshConnEditorOpen] = useState(false);
+
+  const openSshConnEditor = (conn = null) => {
+    if (conn) {
+      setSshConnForm({ id: conn.id, name: conn.name, host: conn.host, port: conn.port || 22, username: conn.username, password: '' });
+    } else {
+      setSshConnForm({ id: '', name: '', host: '', port: 22, username: '', password: '' });
+    }
+    setSshConnEditorOpen(true);
   };
 
-  // 5. Activity Log Audit History View
-  const clearLogsHistory = async () => {
-    if (confirm('Are you sure you want to delete all historical logs? This cannot be undone.')) {
-      await apiCall('/api/history', 'DELETE');
-      fetchHistory();
+  const saveSshConn = async (e) => {
+    e.preventDefault();
+    try {
+      await apiCall('/api/ssh/connections', 'POST', sshConnForm);
+      setSshConnEditorOpen(false);
+      fetchSshConnections();
+      addToast('SSH connection saved', 'success');
+    } catch (err) {
+      addToast('Save failed: ' + err.message, 'error');
     }
   };
 
-  const inspectHistoryLogs = (entry) => {
-    setTerminalTitle(`Audit Log: ${entry.scriptName}`);
-    setTerminalLogs(entry.logs.split('\n'));
-    setTerminalStatus(`Completed (Code: ${entry.exitCode})`);
-    setTerminalExitCode(entry.exitCode);
-    setTerminalOpen(true);
+  const deleteSshConn = async (id, name) => {
+    if (!confirm(`Delete "${name}"?`)) return;
+    await apiCall(`/api/ssh/connections/${id}`, 'DELETE');
+    fetchSshConnections();
+    addToast('Connection deleted', 'info');
   };
 
-  const renderHistoryView = () => {
-    return (
-      <div className="view-section">
-        <div className="section-header-row">
-          <div>
-            <h1 className="text-gradient">Activity History Logs</h1>
-            <p>Database logs of past command runs.</p>
-          </div>
-          <button className="btn btn-danger" onClick={clearLogsHistory}>
-            <Icon name="trash" /> Wipe Audit Logs
-          </button>
+  const renderSshConnectionsView = () => (
+    <div className="view-section">
+      <div className="section-header-row">
+        <div>
+          <h1 className="text-gradient">SSH Connections</h1>
+          <p>Save server credentials for one-tap terminal access from the mobile remote.</p>
         </div>
+        <button className="btn btn-primary" onClick={() => openSshConnEditor()}><Icon name="plus" /> Add Connection</button>
+      </div>
 
-        <div className="glass-card history-card">
-          <div className="table-container">
-            <table className="history-table">
-              <thead>
-                <tr>
-                  <th>Script Reference</th>
-                  <th>Trigger Source</th>
-                  <th>Execution Time</th>
-                  <th>Duration</th>
-                  <th>Run Status</th>
-                  <th className="text-right">Inspect</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="text-center text-muted">No runs logged yet.</td>
-                  </tr>
-                ) : (
-                  history.map(h => {
-                    const statusBadge = h.status === 'success' 
-                      ? <span className="badge badge-success">Success</span> 
-                      : h.status === 'cancelled'
-                        ? <span className="badge badge-muted">Cancelled</span>
-                        : <span className="badge badge-danger">Failed</span>;
-                        
-                    const duration = h.endTime 
-                      ? ((new Date(h.endTime) - new Date(h.startTime)) / 1000).toFixed(1) + 's' 
-                      : 'N/A';
-                      
-                    return (
-                      <tr key={h.id}>
-                        <td><span style={{ fontWeight: 600, color: '#fff' }}>{h.scriptName}</span></td>
-                        <td><span className="badge badge-info">{h.trigger.toUpperCase()}</span></td>
-                        <td>{new Date(h.startTime).toLocaleString()}</td>
-                        <td>{duration}</td>
-                        <td>{statusBadge}</td>
-                        <td className="text-right">
-                          <button className="btn btn-secondary btn-icon" onClick={() => inspectHistoryLogs(h)}>
-                            <Icon name="eye" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+      <div className="scripts-grid">
+        {sshConnections.length === 0
+          ? <div className="glass-card text-center text-muted" style={{ gridColumn: '1/-1', padding: '3rem' }}>No SSH connections saved. Add one to enable SSH terminal widgets in the remote.</div>
+          : sshConnections.map(conn => (
+            <div className="glass-card script-card" key={conn.id}>
+              <div className="script-header">
+                <div>
+                  <h3>{conn.name}</h3>
+                  <span className="badge badge-muted" style={{ fontSize: '0.6rem', marginTop: '0.3rem' }}>SSH</span>
+                </div>
+                <div className="meta-status">
+                  <span className={`status-dot ${conn.hasPassword ? 'success' : 'warn'}`}></span>
+                  <span style={{ fontSize: '0.8rem' }}>{conn.hasPassword ? 'Password set' : 'No auth'}</span>
+                </div>
+              </div>
+              <p className="script-desc font-mono" style={{ fontSize: '0.88rem' }}>{conn.username}@{conn.host}:{conn.port || 22}</p>
+              <div className="script-meta">
+                <span className="text-muted" style={{ fontSize: '0.78rem' }}>Port {conn.port || 22}</span>
+                <div className="script-actions">
+                  <button className="btn btn-secondary btn-icon" onClick={() => openSshConnEditor(conn)} title="Edit"><Icon name="edit" /></button>
+                  <button className="btn btn-secondary btn-icon text-danger" onClick={() => deleteSshConn(conn.id, conn.name)} title="Delete"><Icon name="trash" /></button>
+                  <button className="btn btn-primary btn-icon" onClick={() => setSshTerminalConn(conn)} title="Open Terminal"><Icon name="terminal" /></button>
+                </div>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+
+      {sshConnEditorOpen && (
+        <div className="glass-card editor-card margin-top-lg">
+          <div className="card-title-bar">
+            <h3>{sshConnForm.id ? 'Edit SSH Connection' : 'Add SSH Connection'}</h3>
+            <button className="btn btn-secondary btn-icon" onClick={() => setSshConnEditorOpen(false)}><Icon name="close" /></button>
           </div>
+          <form onSubmit={saveSshConn} className="editor-form">
+            <div className="form-group">
+              <label>Connection Label</label>
+              <input type="text" required value={sshConnForm.name} onChange={e => setSshConnForm({ ...sshConnForm, name: e.target.value })} placeholder="e.g. Production Web Server" />
+            </div>
+            <div className="form-row">
+              <div className="form-group flex-2">
+                <label>Host / IP Address</label>
+                <input type="text" required value={sshConnForm.host} onChange={e => setSshConnForm({ ...sshConnForm, host: e.target.value })} placeholder="192.168.1.100 or server.com" />
+              </div>
+              <div className="form-group" style={{ maxWidth: '120px' }}>
+                <label>Port</label>
+                <input type="number" value={sshConnForm.port} onChange={e => setSshConnForm({ ...sshConnForm, port: parseInt(e.target.value) || 22 })} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group flex-1">
+                <label>Username</label>
+                <input type="text" required value={sshConnForm.username} onChange={e => setSshConnForm({ ...sshConnForm, username: e.target.value })} placeholder="root or ubuntu" />
+              </div>
+              <div className="form-group flex-1">
+                <label>Password</label>
+                <input type="password" value={sshConnForm.password} onChange={e => setSshConnForm({ ...sshConnForm, password: e.target.value })} placeholder={sshConnForm.id ? 'Leave blank to keep current' : 'Enter password'} />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setSshConnEditorOpen(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary"><Icon name="save" /> Save Connection</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {sshTerminalConn && (
+        <SshTerminalModal conn={sshTerminalConn} token={authToken} onClose={() => setSshTerminalConn(null)} />
+      )}
+    </div>
+  );
+
+  // ────────────────────────────────────────────────────────
+  // VIEW 6: HISTORY
+  // ────────────────────────────────────────────────────────
+  const renderHistoryView = () => (
+    <div className="view-section">
+      <div className="section-header-row">
+        <div>
+          <h1 className="text-gradient">Activity History</h1>
+          <p>Past command execution logs and run results.</p>
+        </div>
+        <button className="btn btn-danger" onClick={async () => {
+          if (confirm('Delete all history logs?')) { await apiCall('/api/history', 'DELETE'); fetchHistory(); addToast('History cleared', 'info'); }
+        }}><Icon name="trash" /> Wipe Logs</button>
+      </div>
+      <div className="glass-card history-card">
+        <div className="table-container">
+          <table className="history-table">
+            <thead><tr><th>Script</th><th>Trigger</th><th>Time</th><th>Duration</th><th>Status</th><th className="text-right">Logs</th></tr></thead>
+            <tbody>
+              {history.length === 0
+                ? <tr><td colSpan="6" className="text-center text-muted">No runs logged yet.</td></tr>
+                : history.map(h => {
+                  const dur = h.endTime ? ((new Date(h.endTime) - new Date(h.startTime)) / 1000).toFixed(1) + 's' : '—';
+                  const badge = h.status === 'success' ? 'badge-success' : h.status === 'cancelled' ? 'badge-muted' : 'badge-danger';
+                  return (
+                    <tr key={h.id}>
+                      <td style={{ fontWeight: 600, color: '#fff' }}>{h.scriptName}</td>
+                      <td><span className="badge badge-info">{h.trigger.toUpperCase()}</span></td>
+                      <td>{new Date(h.startTime).toLocaleString()}</td>
+                      <td className="font-mono">{dur}</td>
+                      <td><span className={`badge ${badge}`}>{h.status}</span></td>
+                      <td className="text-right">
+                        <button className="btn btn-secondary btn-icon" onClick={() => {
+                          setTerminalTitle(`Log: ${h.scriptName}`);
+                          setTerminalLogs(h.logs.split('\n'));
+                          setTerminalStatus(`Done (exit ${h.exitCode})`);
+                          setTerminalExitCode(h.exitCode);
+                          setTerminalOpen(true);
+                        }}><Icon name="eye" /></button>
+                      </td>
+                    </tr>
+                  );
+                })
+              }
+            </tbody>
+          </table>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
-  // 6. Settings Page View
+  // ────────────────────────────────────────────────────────
+  // VIEW 7: SETTINGS
+  // ────────────────────────────────────────────────────────
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
     try {
-      const payload = {
-        port: parseInt(settings.port),
-        separatePorts: settings.separatePorts,
-        remotePort: parseInt(settings.remotePort) || 8081,
-        username: settings.username,
-        remotePin: settings.remotePin
-      };
-      // Only send password if user typed something new
-      if (settings.password && settings.password.trim()) {
-        payload.password = settings.password;
-      }
+      const payload = { port: parseInt(settings.port), username: settings.username, remotePin: settings.remotePin };
+      if (settings.password?.trim()) payload.password = settings.password;
       const res = await apiCall('/api/settings', 'POST', payload);
-      alert(res.message);
-    } catch (err) {
-      alert('Failed to save configuration: ' + err.message);
-    }
+      addToast(res.message || 'Settings saved', 'success');
+    } catch (err) { addToast('Failed: ' + err.message, 'error'); }
   };
 
-  const copySecureToken = () => {
-    navigator.clipboard.writeText(settings.secretToken);
-    alert('Security token copied to clipboard.');
-  };
-
-  const renderSettingsView = () => {
-    return (
-      <div className="view-section">
-        <div className="section-header">
-          <h1 className="text-gradient">Daemon Configuration</h1>
-          <p>Modify network sockets, access controls, and background settings.</p>
+  const renderSettingsView = () => (
+    <div className="view-section">
+      <div className="section-header">
+        <h1 className="text-gradient">Daemon Configuration</h1>
+        <p>Network, credentials, and remote access settings.</p>
+      </div>
+      <div className="settings-layout">
+        <div className="glass-card settings-box">
+          <h3>Access & Network</h3>
+          <p className="settings-desc">Change port, admin credentials, and remote PIN. Restart required for port changes.</p>
+          <form onSubmit={handleSettingsSubmit} className="editor-form margin-top-md">
+            <div className="form-group">
+              <label>Dashboard Port</label>
+              <input type="number" required value={settings.port} onChange={e => setSettings({ ...settings, port: e.target.value })} />
+              <small className="text-muted">Admin dashboard and mobile remote share this port. Restart to apply.</small>
+            </div>
+            <div className="form-group">
+              <label>Admin Username</label>
+              <input type="text" value={settings.username} onChange={e => setSettings({ ...settings, username: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>Admin Password</label>
+              <input type="password" value={settings.password} onChange={e => setSettings({ ...settings, password: e.target.value })} placeholder="Leave blank to keep current" />
+            </div>
+            <div className="form-group">
+              <label>Mobile Remote PIN (4 digits)</label>
+              <input type="text" maxLength="4" pattern="[0-9]{4}" value={settings.remotePin} onChange={e => setSettings({ ...settings, remotePin: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="1234" />
+              <small className="text-muted">Used to unlock the mobile remote panel from phone/tablet.</small>
+            </div>
+            <div className="form-group">
+              <label>API Security Token</label>
+              <div className="copy-input-row">
+                <input type="text" readOnly value={settings.secretToken} className="font-mono" />
+                <button type="button" className="btn btn-secondary btn-icon" onClick={() => { navigator.clipboard.writeText(settings.secretToken); addToast('Token copied', 'success'); }}><Icon name="copy" /></button>
+              </div>
+              <small className="text-muted">Auto-generated. Used for API authentication.</small>
+            </div>
+            <button type="submit" className="btn btn-primary margin-top-md">Save Configuration</button>
+          </form>
         </div>
 
-        <div className="settings-layout">
-          {/* network options */}
-          <div className="glass-card settings-box">
-            <h3>Network Setup</h3>
-            <p className="settings-desc">Change the web ports bound by Uvicorn. Autostart service requires reloading after changes.</p>
-
-            <form onSubmit={handleSettingsSubmit} className="editor-form margin-top-md">
-              <div className="form-group">
-                <label>Primary Port (Dashboard)</label>
-                <input type="number" required value={settings.port} onChange={e => setSettings({...settings, port: e.target.value})} />
-              </div>
-
-              <div className="form-group checkbox-row">
-                <label className="checkbox-label font-md">
-                  <input type="checkbox" checked={settings.separatePorts} onChange={e => setSettings({...settings, separatePorts: e.target.checked})} /> Run Remote on separate port
-                </label>
-              </div>
-
-              {settings.separatePorts && (
-                <div className="form-group">
-                  <label>Dedicated Remote Port</label>
-                  <input type="number" required value={settings.remotePort} onChange={e => setSettings({...settings, remotePort: e.target.value})} />
-                </div>
-              )}
-
-              <div className="form-group">
-                <label>Admin Username</label>
-                <input type="text" value={settings.username} onChange={e => setSettings({...settings, username: e.target.value})} placeholder="admin" />
-              </div>
-
-              <div className="form-group">
-                <label>Admin Password</label>
-                <input type="password" value={settings.password} onChange={e => setSettings({...settings, password: e.target.value})} placeholder="Leave blank to keep current" />
-                <small className="text-muted">Leave blank to keep existing password unchanged.</small>
-              </div>
-
-              <div className="form-group">
-                <label>Mobile Remote PIN (4-digit)</label>
-                <input type="text" maxLength="4" pattern="[0-9]{4}" value={settings.remotePin} onChange={e => setSettings({...settings, remotePin: e.target.value.replace(/\D/g, '').slice(0,4)})} placeholder="e.g. 1234" />
-                <small className="text-muted">Used to access the mobile remote panel from your phone.</small>
-              </div>
-
-              <div className="form-group">
-                <label>Security API Token</label>
-                <div className="copy-input-row">
-                  <input type="text" readOnly className="bg-card font-mono" value={settings.secretToken} />
-                  <button type="button" className="btn btn-secondary btn-icon" onClick={copySecureToken}>
-                    <Icon name="copy" />
-                  </button>
-                </div>
-                <small className="text-muted">Internal token used for API authorization. Auto-generated on install.</small>
-              </div>
-
-              <button type="submit" className="btn btn-primary margin-top-md">
-                Save Configuration
-              </button>
-            </form>
-          </div>
-
-          {/* startup guide */}
-          <div className="glass-card settings-box">
-            <h3>Autostart Service (systemd)</h3>
-            <p className="settings-desc">Keep ServManager running in the background automatically when your Linux server boots up.</p>
-
-            <div className="service-setup-instructions margin-top-md">
-              <h5>1. Install command-line helper:</h5>
-              <pre className="code-block">curl -sSL https://raw.githubusercontent.com/ServManager/install.sh | bash</pre>
-              
-              <h5 className="margin-top-sm">2. Service File Configuration (`/etc/systemd/system/servmanager.service`):</h5>
-              <pre className="code-block font-xs">{`[Unit]
+        <div className="glass-card settings-box">
+          <h3>systemd Autostart</h3>
+          <p className="settings-desc">Keep ServManager running on server boot.</p>
+          <div className="service-setup-instructions margin-top-md">
+            <h5>1. Install</h5>
+            <pre className="code-block">curl -sSL https://raw.githubusercontent.com/SahilSidhu7/ServManager/main/install.sh | bash</pre>
+            <h5 className="margin-top-sm">2. Service file <span className="text-muted">(/etc/systemd/system/servmanager.service)</span></h5>
+            <pre className="code-block font-xs">{`[Unit]
 Description=ServManager Daemon
 After=network.target
 
@@ -1459,228 +1430,224 @@ Restart=always
 
 [Install]
 WantedBy=multi-user.target`}</pre>
-
-              <h5 className="margin-top-sm">3. Start service:</h5>
-              <pre className="code-block">{`sudo systemctl daemon-reload
+            <h5 className="margin-top-sm">3. Enable</h5>
+            <pre className="code-block">{`sudo systemctl daemon-reload
 sudo systemctl enable servmanager
 sudo systemctl start servmanager`}</pre>
-            </div>
+            <h5 className="margin-top-sm">4. SSH support (optional)</h5>
+            <pre className="code-block">pip install asyncssh</pre>
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
-  // 7. Remote Pad View (Optimized for Mobile/Tablet control)
-  const renderRemoteView = () => {
-    return (
-      <div className="remote-wrapper">
-        <header className="remote-header">
-          <div className="header-logo">
-            <Icon name="server" />
-            <div>
-              <h1>ServManager Remote</h1>
-              <span className="hostname-display">{stats.hostname} ({stats.platform})</span>
-            </div>
+  // ────────────────────────────────────────────────────────
+  // REMOTE VIEW (mobile/tablet)
+  // ────────────────────────────────────────────────────────
+  const renderRemoteView = () => (
+    <div className="remote-wrapper">
+      <header className="remote-header">
+        <div className="header-logo">
+          <Icon name="server" />
+          <div>
+            <h1>ServManager Remote</h1>
+            <span className="hostname-display">{stats.hostname} · {stats.platform}</span>
           </div>
-          <div className="header-status">
-            <span className="badge badge-success">
-              <span className="pulse-dot green" style={{ width: 6, height: 6, marginRight: 4 }}></span> Connected
-            </span>
-            <button
-              className="btn btn-secondary"
-              style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', marginLeft: '0.5rem' }}
-              onClick={handleLogout}
-              title="Lock remote panel"
-            >
-              <Icon name="key" /> Lock
-            </button>
-          </div>
-        </header>
+        </div>
+        <div className="header-status">
+          <span className="badge badge-success">
+            <span className="pulse-dot green" style={{ width: 6, height: 6, marginRight: 4 }}></span>Live
+          </span>
+          <button className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', marginLeft: '0.5rem' }} onClick={handleLogout}>
+            <Icon name="key" /> Lock
+          </button>
+        </div>
+      </header>
 
-        <main className="remote-grid">
-          {remoteWidgets.length === 0 ? (
-            <div className="grid-placeholder">
-              <Icon name="layout" />
-              <p>No widgets found. Configure layouts from the Dashboard Designer settings.</p>
-            </div>
-          ) : (
-            [...remoteWidgets].sort((a,b) => a.position - b.position).map(w => {
-              // Retrieve bound script status if indicator
-              const script = scripts.find(s => s.id === w.scriptId);
-              const status = script?.lastStatus || '';
-              const statusClass = status === 'success' ? 'success' : status === 'failure' ? 'danger' : status === 'warn' ? 'warn' : 'inactive';
-              
-              const isRunning = currentRunId && script && currentRunId.includes(script.id) && terminalStatus === 'Running';
+      <main className="remote-grid">
+        {remoteWidgets.length === 0
+          ? <div className="grid-placeholder"><Icon name="layout" /><p>No widgets. Configure from Admin → Designer.</p></div>
+          : [...remoteWidgets].sort((a, b) => a.position - b.position).map(w => {
+            const script = scripts.find(s => s.id === w.scriptId);
+            const sshConn = sshConnections.find(c => c.id === w.sshConnectionId);
+            const status = script?.lastStatus || '';
+            const sc = status === 'success' ? 'success' : status === 'failure' ? 'danger' : 'inactive';
+            const isRunning = currentRunId && script?.id && currentRunId.includes(script.id) && terminalStatus === 'Running';
 
-              if (w.type === 'button') {
-                return (
-                  <div key={w.id} className={`remote-widget size-${w.size} accent-${w.color} ${isRunning ? 'running' : ''}`} onClick={() => !isRunning && script && runScript(script, 'remote')}>
-                    <div className="widget-icon-wrap"><Icon name={w.icon} /></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div className="widget-title-display">{w.title}</div>
-                      <div className="widget-sub-display">Tap to Trigger</div>
-                    </div>
-                  </div>
-                );
-              } else if (w.type === 'indicator') {
-                return (
-                  <div key={w.id} className={`remote-widget size-${w.size} accent-${w.color}`}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div className={`indicator-ring ${statusClass}`}></div>
-                      <div className="widget-icon-wrap"><Icon name={w.icon} /></div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div className="widget-title-display">{w.title}</div>
-                      <div className="widget-sub-display">{status ? status.toUpperCase() : 'UNKNOWN'}</div>
-                    </div>
-                  </div>
-                );
-              } else if (w.type === 'metric') {
-                let displayVal = '--';
-                if (w.metricType === 'cpu') displayVal = `${Math.round(stats.cpu)}%`;
-                else if (w.metricType === 'ram') displayVal = `${Math.round(stats.ram.pct)}%`;
-                else if (w.metricType === 'disk') displayVal = `${Math.round(stats.disk.pct)}%`;
-                else if (w.metricType === 'uptime') displayVal = formatUptime(stats.uptime);
-
-                return (
-                  <div key={w.id} className={`remote-widget size-${w.size} accent-${w.color}`}>
-                    <div className="widget-icon-wrap"><Icon name={w.icon} /></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-                      <div className="metric-number-display">{displayVal}</div>
-                      <div className="widget-title-display">{w.title}</div>
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            })
-          )}
-        </main>
-
-        {/* Console Slide up drawer */}
-        <div className={`console-drawer ${remoteDrawerOpen ? '' : 'hidden'}`}>
-          <div className="drawer-header">
-            <div className="drawer-title">Console Output: {remoteDrawerTitle}</div>
-            <div className="drawer-actions">
-              {terminalStatus === 'Running' && (
-                <button className="btn btn-danger btn-cancel-drawer" onClick={cancelExecution}>
-                  <Icon name="stop" /> Kill Task
-                </button>
-              )}
-              <button className="btn-close-drawer" onClick={() => setRemoteDrawerOpen(false)}>&times;</button>
-            </div>
-          </div>
-          <div className="drawer-body">
-            {terminalLogs.map((line, idx) => (
-              <div key={idx} className={`terminal-line ${line.includes('[system-err]') || line.includes('[stderr]') ? 'error' : line.includes('===') ? 'system' : ''}`}>
-                {line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '')}
+            if (w.type === 'button') return (
+              <div key={w.id} className={`remote-widget type-button size-${w.size} accent-${w.color}${isRunning ? ' running' : ''}`}
+                onClick={() => !isRunning && script && runScript(script, 'remote')}>
+                <div className="widget-icon-wrap"><Icon name={w.icon} /></div>
+                <div className="widget-body">
+                  <div className="widget-title-display">{w.title}</div>
+                  {w.description && <div className="widget-sub-display">{w.description}</div>}
+                  <div className="widget-action-hint">{isRunning ? 'Running...' : 'Tap to run'}</div>
+                </div>
               </div>
-            ))}
-            <div ref={terminalBottomRef} />
-          </div>
-        </div>
-      </div>
-    );
-  };
+            );
 
-  // ----------------------------------------------------
-  // MAIN SITE SHELL RENDERING
-  // ----------------------------------------------------
-  if (showAuthModal) {
-    return (
-      <div className="modal-overlay">
-        <div className="glass-card modal-content auth-card">
-          <h2 className="text-gradient">ServManager</h2>
-          <p>Sign in with your admin credentials to access the dashboard.</p>
-          <div className="form-group">
-            <label>Username</label>
-            <input
-              type="text"
-              value={authUsername}
-              onChange={e => setAuthUsername(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAuthenticate()}
-              placeholder="admin"
-              autoFocus
-            />
+            if (w.type === 'indicator') return (
+              <div key={w.id} className={`remote-widget type-indicator size-${w.size} accent-${w.color}`}>
+                <div className="indicator-status-row">
+                  <div className={`indicator-ring ${sc}`}></div>
+                  <div className="widget-icon-wrap sm"><Icon name={w.icon} /></div>
+                </div>
+                <div className="widget-body">
+                  <div className="widget-title-display">{w.title}</div>
+                  {w.description && <div className="widget-sub-display">{w.description}</div>}
+                  <div className={`widget-status-badge ${sc}`}>{status ? status.toUpperCase() : 'UNKNOWN'}</div>
+                </div>
+              </div>
+            );
+
+            if (w.type === 'metric') {
+              let val = '--';
+              if (w.metricType === 'cpu') val = `${Math.round(stats.cpu)}%`;
+              else if (w.metricType === 'ram') val = `${Math.round(stats.ram.pct)}%`;
+              else if (w.metricType === 'disk') val = `${Math.round(stats.disk.pct)}%`;
+              else if (w.metricType === 'uptime') val = formatUptime(stats.uptime);
+              return (
+                <div key={w.id} className={`remote-widget type-metric size-${w.size} accent-${w.color}`}>
+                  <div className="widget-icon-wrap"><Icon name={w.icon} /></div>
+                  <div className="widget-body">
+                    <div className="metric-number-display">{val}</div>
+                    <div className="widget-title-display">{w.title}</div>
+                    {w.description && <div className="widget-sub-display">{w.description}</div>}
+                  </div>
+                </div>
+              );
+            }
+
+            if (w.type === 'ssh') return (
+              <div key={w.id} className={`remote-widget type-ssh size-${w.size} accent-${w.color}`}
+                onClick={() => sshConn && setSshTerminalConn(sshConn)}>
+                <div className="widget-icon-wrap"><Icon name="ssh" /></div>
+                <div className="widget-body">
+                  <div className="widget-title-display">{w.title}</div>
+                  {sshConn
+                    ? <div className="widget-sub-display font-mono">{sshConn.username}@{sshConn.host}</div>
+                    : <div className="widget-sub-display" style={{ color: 'var(--status-danger)' }}>No connection</div>
+                  }
+                  <div className="widget-action-hint">Tap to open terminal</div>
+                </div>
+              </div>
+            );
+
+            return null;
+          })
+        }
+      </main>
+
+      {/* Console Drawer */}
+      <div className={`console-drawer ${remoteDrawerOpen ? '' : 'hidden'}`}>
+        <div className="drawer-header">
+          <div className="drawer-title">{remoteDrawerTitle}</div>
+          <div className="drawer-actions">
+            {terminalStatus === 'Running' && (
+              <button className="btn btn-danger btn-cancel-drawer" onClick={cancelExecution}><Icon name="stop" /> Kill</button>
+            )}
+            <button className="btn-close-drawer" onClick={() => setRemoteDrawerOpen(false)}>&times;</button>
           </div>
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              value={authPassword}
-              onChange={e => setAuthPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAuthenticate()}
-              placeholder="••••••••"
-            />
-          </div>
-          {authError && <p style={{ color: 'var(--status-danger)', fontSize: '0.88rem', marginBottom: '0.5rem' }}>{authError}</p>}
-          <button className="btn btn-primary" onClick={handleAuthenticate}>Sign In</button>
+        </div>
+        <div className="drawer-body">
+          {terminalLogs.map((line, i) => (
+            <div key={i} className={`terminal-line ${line.includes('[system-err]') || line.includes('[stderr]') ? 'error' : line.includes('===') || line.includes('[Step') ? 'system' : ''}`}>
+              {line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '')}
+            </div>
+          ))}
+          <div ref={terminalBottomRef} />
         </div>
       </div>
-    );
-  }
+
+      {sshTerminalConn && (
+        <SshTerminalModal conn={sshTerminalConn} token={authToken} onClose={() => setSshTerminalConn(null)} />
+      )}
+    </div>
+  );
+
+  // ────────────────────────────────────────────────────────
+  // AUTH SCREENS
+  // ────────────────────────────────────────────────────────
+  if (showAuthModal) return (
+    <div className="modal-overlay">
+      <div className="glass-card modal-content auth-card">
+        <div className="auth-logo"><Icon name="server" className="icon-svg" style={{ width: 32, height: 32 }} /></div>
+        <h2 className="text-gradient">ServManager</h2>
+        <p className="text-muted" style={{ marginBottom: '1.5rem' }}>Sign in to access the admin dashboard.</p>
+        <div className="form-group">
+          <label>Username</label>
+          <input type="text" value={authUsername} onChange={e => setAuthUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAuthenticate()} placeholder="admin" autoFocus />
+        </div>
+        <div className="form-group">
+          <label>Password</label>
+          <input type="password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAuthenticate()} placeholder="••••••••" />
+        </div>
+        {authError && <p style={{ color: 'var(--status-danger)', fontSize: '0.88rem', marginBottom: '0.75rem' }}>{authError}</p>}
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleAuthenticate}>Sign In</button>
+      </div>
+    </div>
+  );
 
   if (isRemoteRoute) {
-    if (showRemotePin) {
-      return (
-        <div className="pin-overlay">
-          <div className="pin-card">
-            <h2>Remote Access</h2>
-            <p className="pin-subtitle">Enter your 4-digit PIN to continue</p>
-            <div className="pin-display">
-              {[0,1,2,3].map(i => (
-                <div key={i} className={`pin-dot${i < pinValue.length ? (pinShake ? ' error' : ' filled') : ''}`} />
-              ))}
-            </div>
-            <div className="pin-keypad">
-              {[1,2,3,4,5,6,7,8,9].map(n => (
-                <button key={n} className="pin-key" onClick={() => handlePinKey(String(n))}>{n}</button>
-              ))}
-              <button className="pin-key pin-key-zero" onClick={() => handlePinKey('0')}>0</button>
-              <button className="pin-key pin-key-del" onClick={handlePinDelete}>⌫</button>
-            </div>
-            {pinError && <p className="pin-error-msg">{pinError}</p>}
+    if (showRemotePin) return (
+      <div className="pin-overlay">
+        <div className="pin-card">
+          <div className="pin-logo"><Icon name="server" /></div>
+          <h2>Remote Access</h2>
+          <p className="pin-subtitle">Enter your 4-digit PIN to continue</p>
+          <div className={`pin-display${pinShake ? ' shake' : ''}`}>
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className={`pin-dot${i < pinValue.length ? (pinShake ? ' error' : ' filled') : ''}`} />
+            ))}
           </div>
+          <div className="pin-keypad">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+              <button key={n} className="pin-key" onClick={() => handlePinKey(String(n))}>{n}</button>
+            ))}
+            <div></div>
+            <button className="pin-key pin-key-zero" onClick={() => handlePinKey('0')}>0</button>
+            <button className="pin-key pin-key-del" onClick={() => setPinValue(p => p.slice(0, -1))}>⌫</button>
+          </div>
+          {pinError && <p className="pin-error-msg">{pinError}</p>}
         </div>
-      );
-    }
+      </div>
+    );
     return renderRemoteView();
   }
 
+  // ────────────────────────────────────────────────────────
+  // ADMIN DASHBOARD SHELL
+  // ────────────────────────────────────────────────────────
+  const NAV = [
+    { id: 'stats', icon: 'stats', label: 'Diagnostics' },
+    { id: 'scripts', icon: 'terminal', label: 'Scripts' },
+    { id: 'workflows', icon: 'flow', label: 'Workflows' },
+    { id: 'remote-designer', icon: 'layout', label: 'Remote Designer' },
+    { id: 'ssh-connections', icon: 'ssh', label: 'SSH Connections' },
+    { id: 'history', icon: 'activity', label: 'Run History' },
+    { id: 'settings', icon: 'settings', label: 'Settings' },
+  ];
+
   return (
     <div className="dashboard-container">
-      {/* Sidebar navigation */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="brand-logo">
-            <Icon name="server" />
-          </div>
+          <div className="brand-logo"><Icon name="server" /></div>
           <div className="brand-text">
             <h2>ServManager</h2>
-            <span className="badge badge-success">Python FastAPI</span>
+            <span className="badge badge-success">FastAPI</span>
           </div>
         </div>
 
         <nav className="sidebar-menu">
-          <button className={`menu-item ${view === 'stats' ? 'active' : ''}`} onClick={() => handleNavClick('stats')}>
-            <Icon name="stats" /> Diagnostics
-          </button>
-          <button className={`menu-item ${view === 'scripts' ? 'active' : ''}`} onClick={() => handleNavClick('scripts')}>
-            <Icon name="terminal" /> Scripts
-          </button>
-          <button className={`menu-item ${view === 'workflows' ? 'active' : ''}`} onClick={() => handleNavClick('workflows')}>
-            <Icon name="flow" /> Workflows
-          </button>
-          <button className={`menu-item ${view === 'remote-designer' ? 'active' : ''}`} onClick={() => handleNavClick('remote-designer')}>
-            <Icon name="layout" /> Designer
-          </button>
-          <button className={`menu-item ${view === 'history' ? 'active' : ''}`} onClick={() => handleNavClick('history')}>
-            <Icon name="activity" /> Run History
-          </button>
-          <button className={`menu-item ${view === 'settings' ? 'active' : ''}`} onClick={() => handleNavClick('settings')}>
-            <Icon name="settings" /> Settings
-          </button>
+          {NAV.map(({ id, icon, label }) => (
+            <button key={id} className={`menu-item ${view === id ? 'active' : ''}`} onClick={() => setView(id)}>
+              <Icon name={icon} /> {label}
+            </button>
+          ))}
         </nav>
 
         <div className="sidebar-footer">
@@ -1688,43 +1655,37 @@ sudo systemctl start servmanager`}</pre>
             <div className="node-icon"><Icon name="activity" /></div>
             <div className="node-detail">
               <span className="node-name">{stats.hostname}</span>
-              <span className="node-ip">uptime: {formatUptime(stats.uptime)}</span>
+              <span className="node-ip">up {formatUptime(stats.uptime)}</span>
             </div>
           </div>
           <div className="sidebar-logout">
-            <button className="btn btn-logout" onClick={handleLogout}>
-              <Icon name="logout" /> Sign Out
-            </button>
+            <button className="btn btn-logout" onClick={handleLogout}><Icon name="logout" /> Sign Out</button>
           </div>
         </div>
       </aside>
 
-      {/* Main Admin Contents */}
       <main className="main-content">
         {view === 'stats' && renderStatsView()}
         {view === 'scripts' && renderScriptsView()}
         {view === 'workflows' && renderWorkflowsView()}
         {view === 'remote-designer' && renderRemoteDesigner()}
+        {view === 'ssh-connections' && renderSshConnectionsView()}
         {view === 'history' && renderHistoryView()}
         {view === 'settings' && renderSettingsView()}
       </main>
 
-      {/* Spawning Terminal Dialog */}
+      {/* Admin terminal modal */}
       {terminalOpen && (
-        <div className="modal-overlay">
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setTerminalOpen(false)}>
           <div className="glass-card modal-content terminal-card">
             <div className="terminal-header">
-              <div className="terminal-dots">
-                <span className="dot red"></span>
-                <span className="dot yellow"></span>
-                <span className="dot green"></span>
-              </div>
+              <div className="terminal-dots"><span className="dot red"></span><span className="dot yellow"></span><span className="dot green"></span></div>
               <div className="terminal-title">{terminalTitle}</div>
               <button className="btn-close" onClick={() => setTerminalOpen(false)}>&times;</button>
             </div>
             <div className="terminal-body">
-              {terminalLogs.map((line, idx) => (
-                <div key={idx} className={`terminal-line ${line.includes('[system-err]') || line.includes('[stderr]') ? 'error' : line.includes('===') || line.includes('[Step') ? 'system' : ''}`}>
+              {terminalLogs.map((line, i) => (
+                <div key={i} className={`terminal-line ${line.includes('[system-err]') || line.includes('[stderr]') ? 'error' : line.includes('===') || line.includes('[Step') ? 'system' : ''}`}>
                   {line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '')}
                 </div>
               ))}
@@ -1733,18 +1694,20 @@ sudo systemctl start servmanager`}</pre>
             <div className="terminal-footer">
               <div className="status-indicator-wrap">
                 <span className={`pulse-dot ${terminalStatus === 'Running' || terminalStatus === 'Spawning' ? 'green' : 'red'}`}></span>
-                <span>{terminalStatus} {terminalStatus.startsWith('Finished') ? `(Code: ${terminalExitCode})` : ''}</span>
+                <span>{terminalStatus}{terminalStatus.startsWith('Finished') ? ` (exit ${terminalExitCode})` : ''}</span>
               </div>
               {(terminalStatus === 'Running' || terminalStatus === 'Spawning') && (
-                <button className="btn btn-danger" onClick={cancelExecution}>
-                  <Icon name="stop" /> Abort Task
-                </button>
+                <button className="btn btn-danger" onClick={cancelExecution}><Icon name="stop" /> Abort</button>
               )}
             </div>
           </div>
         </div>
       )}
+
+      {/* SSH terminal from admin view */}
+      {sshTerminalConn && (
+        <SshTerminalModal conn={sshTerminalConn} token={authToken} onClose={() => setSshTerminalConn(null)} />
+      )}
     </div>
   );
 }
-

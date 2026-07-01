@@ -2,12 +2,11 @@ import os
 import json
 import time
 import asyncio
-import threading
+from contextlib import asynccontextmanager
 from typing import Dict, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 
@@ -15,7 +14,15 @@ from database import read_db, update_db
 from system_monitor import get_system_stats, get_active_ports
 from executor import ScriptExecutor
 
-app = FastAPI(title="ServManager Admin")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    asyncio.create_task(stats_broadcast_loop())
+    start_schedulers()
+    yield
+
+
+app = FastAPI(title="ServManager Admin", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -125,9 +132,7 @@ async def api_login(payload: dict):
     password = payload.get("password")
     db = read_db()
     settings = db.get("settings", {})
-    expected_username = settings.get("username", "admin")
-    expected_password = settings.get("password", "admin")
-    if username == expected_username and password == expected_password:
+    if username == settings.get("username", "admin") and password == settings.get("password", "admin"):
         return {"success": True, "token": settings.get("secretToken", "")}
     raise HTTPException(status_code=401, detail="Invalid username or password")
 
@@ -137,8 +142,7 @@ async def api_remote_login(payload: dict):
     pin = payload.get("pin")
     db = read_db()
     settings = db.get("settings", {})
-    expected_pin = settings.get("remotePin", "1234")
-    if str(pin) == str(expected_pin):
+    if str(pin) == str(settings.get("remotePin", "1234")):
         return {"success": True, "token": settings.get("secretToken", "")}
     raise HTTPException(status_code=401, detail="Invalid PIN code")
 
@@ -164,7 +168,6 @@ async def run_indicator_task(script_id: str, interval_seconds: int):
 
             def append_log(text):
                 output_log.append(text)
-                # Schedule broadcast without blocking sync callback
                 asyncio.run_coroutine_threadsafe(
                     manager.broadcast_log(run_id, text), loop
                 )
@@ -212,7 +215,7 @@ def start_schedulers():
 
 
 # ─────────────────────────────────────────────────────────
-# REST API ENDPOINTS
+# REST API — SYSTEM
 # ─────────────────────────────────────────────────────────
 
 @app.get("/api/system/stats", dependencies=[Depends(verify_token)])
@@ -224,6 +227,22 @@ async def api_system_stats():
 async def api_system_ports():
     return get_active_ports()
 
+
+@app.get("/api/system/info", dependencies=[Depends(verify_token)])
+async def api_system_info(request: Request):
+    db = read_db()
+    port = db.get("settings", {}).get("port", 8080)
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or f"localhost:{port}"
+    scheme = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
+    return {
+        "remoteUrl": f"{scheme}://{host}/remote",
+        "baseUrl": f"{scheme}://{host}",
+    }
+
+
+# ─────────────────────────────────────────────────────────
+# REST API — SCRIPTS
+# ─────────────────────────────────────────────────────────
 
 @app.get("/api/scripts", dependencies=[Depends(verify_token)])
 async def api_get_scripts():
@@ -324,7 +343,7 @@ async def api_run_script(payload: dict):
                 "exitCode": res["code"],
                 "logs": complete_output,
             })
-            data["history"] = data["history"][:50]
+            data["history"] = data["history"][:100]
 
         update_db(db_updater)
 
@@ -347,6 +366,10 @@ async def api_cancel_script(payload: dict):
     return {"success": killed}
 
 
+# ─────────────────────────────────────────────────────────
+# REST API — REMOTE CONFIG
+# ─────────────────────────────────────────────────────────
+
 @app.get("/api/remote/config", dependencies=[Depends(verify_token)])
 async def api_get_remote_config():
     db = read_db()
@@ -366,6 +389,10 @@ async def api_save_remote_config(config: dict):
     return {"success": True}
 
 
+# ─────────────────────────────────────────────────────────
+# REST API — HISTORY
+# ─────────────────────────────────────────────────────────
+
 @app.get("/api/history", dependencies=[Depends(verify_token)])
 async def api_get_history():
     db = read_db()
@@ -380,14 +407,16 @@ async def api_clear_history():
     return {"success": True}
 
 
+# ─────────────────────────────────────────────────────────
+# REST API — SETTINGS
+# ─────────────────────────────────────────────────────────
+
 @app.get("/api/settings", dependencies=[Depends(verify_token)])
 async def api_get_settings():
     db = read_db()
     s = db.get("settings", {})
     return {
         "port": s.get("port", 8080),
-        "separatePorts": s.get("separatePorts", False),
-        "remotePort": s.get("remotePort", 8081),
         "secretToken": s.get("secretToken", ""),
         "username": s.get("username", "admin"),
         "password": s.get("password", "admin"),
@@ -397,6 +426,9 @@ async def api_get_settings():
 
 @app.post("/api/settings", dependencies=[Depends(verify_token)])
 async def api_save_settings(settings: dict):
+    settings.pop("separatePorts", None)
+    settings.pop("remotePort", None)
+
     def updater(db):
         db.setdefault("settings", {}).update(settings)
     update_db(updater)
@@ -407,7 +439,62 @@ async def api_save_settings(settings: dict):
 
 
 # ─────────────────────────────────────────────────────────
-# WEBSOCKET ENDPOINT
+# REST API — SSH CONNECTIONS
+# ─────────────────────────────────────────────────────────
+
+@app.get("/api/ssh/connections", dependencies=[Depends(verify_token)])
+async def api_get_ssh_connections():
+    db = read_db()
+    result = []
+    for c in db.get("sshConnections", []):
+        result.append({
+            "id": c["id"],
+            "name": c["name"],
+            "host": c["host"],
+            "port": c.get("port", 22),
+            "username": c["username"],
+            "hasPassword": bool(c.get("password")),
+        })
+    return result
+
+
+@app.post("/api/ssh/connections", dependencies=[Depends(verify_token)])
+async def api_save_ssh_connection(conn: dict):
+    if not conn.get("host") or not conn.get("username"):
+        raise HTTPException(status_code=400, detail="Host and username are required")
+
+    conn_id = conn.get("id")
+
+    def updater(db):
+        conns = db.setdefault("sshConnections", [])
+        if conn_id:
+            idx = next((i for i, c in enumerate(conns) if c["id"] == conn_id), -1)
+            if idx != -1:
+                if not conn.get("password"):
+                    conn["password"] = conns[idx].get("password", "")
+                conns[idx] = conn
+            else:
+                if not conn.get("id"):
+                    conn["id"] = f"ssh_{int(time.time() * 1000)}"
+                conns.append(conn)
+        else:
+            conn["id"] = f"ssh_{int(time.time() * 1000)}"
+            conns.append(conn)
+
+    update_db(updater)
+    return {"success": True}
+
+
+@app.delete("/api/ssh/connections/{conn_id}", dependencies=[Depends(verify_token)])
+async def api_delete_ssh_connection(conn_id: str):
+    def updater(db):
+        db["sshConnections"] = [c for c in db.get("sshConnections", []) if c["id"] != conn_id]
+    update_db(updater)
+    return {"success": True}
+
+
+# ─────────────────────────────────────────────────────────
+# WEBSOCKET — MAIN
 # ─────────────────────────────────────────────────────────
 
 @app.websocket("/ws")
@@ -431,7 +518,100 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-# Broadcasts live stats every 2 s to all subscribed clients
+# ─────────────────────────────────────────────────────────
+# WEBSOCKET — SSH TERMINAL
+# ─────────────────────────────────────────────────────────
+
+@app.websocket("/ws/ssh/{connection_id}")
+async def ssh_terminal_ws(websocket: WebSocket, connection_id: str):
+    token = websocket.query_params.get("token", "")
+    db = read_db()
+    settings = db.get("settings", {})
+
+    if token != settings.get("secretToken", ""):
+        await websocket.close(code=1008)
+        return
+
+    conn = next((c for c in db.get("sshConnections", []) if c["id"] == connection_id), None)
+    if not conn:
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+
+    try:
+        try:
+            import asyncssh
+        except ImportError:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "data": "asyncssh not installed on server. Run: pip install asyncssh\r\n"
+            }))
+            await websocket.close()
+            return
+
+        async with asyncssh.connect(
+            conn["host"],
+            port=int(conn.get("port", 22)),
+            username=conn["username"],
+            password=conn.get("password", ""),
+            known_hosts=None,
+            connect_timeout=15
+        ) as ssh_conn:
+            async with ssh_conn.create_process(
+                term_type='xterm-256color',
+                term_size=(80, 24)
+            ) as proc:
+
+                async def ws_to_ssh():
+                    try:
+                        while True:
+                            raw = await websocket.receive_text()
+                            msg = json.loads(raw)
+                            if msg.get("type") == "data":
+                                proc.stdin.write(msg["data"])
+                            elif msg.get("type") == "resize":
+                                proc.change_terminal_size(
+                                    int(msg.get("cols", 80)),
+                                    int(msg.get("rows", 24))
+                                )
+                    except Exception:
+                        pass
+
+                async def ssh_to_ws():
+                    try:
+                        async for data in proc.stdout:
+                            await websocket.send_text(json.dumps({"type": "data", "data": data}))
+                    except Exception:
+                        pass
+
+                tasks = [
+                    asyncio.create_task(ws_to_ssh()),
+                    asyncio.create_task(ssh_to_ws()),
+                ]
+                _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                for task in pending:
+                    task.cancel()
+
+    except Exception as e:
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "data": f"SSH Error: {str(e)}\r\n"
+            }))
+        except Exception:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
+# ─────────────────────────────────────────────────────────
+# STATS BROADCAST LOOP
+# ─────────────────────────────────────────────────────────
+
 async def stats_broadcast_loop():
     while True:
         if manager.stats_subscribers:
@@ -450,14 +630,8 @@ async def stats_broadcast_loop():
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(stats_broadcast_loop())
-    start_schedulers()
-
-
 @app.get("/{catchall:path}")
-async def serve_frontend(catchall: str, request: Request):
+async def serve_frontend(catchall: str):
     if catchall.startswith("api/") or catchall.startswith("ws"):
         return JSONResponse(status_code=404, content={"error": "Not found"})
     file_path = os.path.join(FRONTEND_DIR, catchall)
@@ -473,42 +647,6 @@ async def serve_frontend(catchall: str, request: Request):
 
 
 # ─────────────────────────────────────────────────────────
-# DUAL-PORT: DEDICATED REMOTE PANEL
-# ─────────────────────────────────────────────────────────
-
-def start_remote_only_server(port: int):
-    """Run a minimal ASGI app on a separate port that forwards to the main app."""
-    remote_app = FastAPI(title="ServManager Remote Panel")
-    remote_app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    @remote_app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-    async def api_proxy(request: Request, path: str):
-        return await app(request.scope, request.receive, request._send)
-
-    @remote_app.websocket("/ws")
-    async def ws_proxy(websocket: WebSocket):
-        await websocket_endpoint(websocket)
-
-    @remote_app.get("/{catchall:path}")
-    async def serve_remote_ui(catchall: str):
-        file_path = os.path.join(FRONTEND_DIR, catchall)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-        index_path = os.path.join(FRONTEND_DIR, "index.html")
-        if os.path.isfile(index_path):
-            return FileResponse(index_path)
-        return JSONResponse(content={"message": "Remote UI compiling…"})
-
-    uvicorn.run(remote_app, host="0.0.0.0", port=port, log_level="warning")
-
-
-# ─────────────────────────────────────────────────────────
 # ENTRY POINT
 # ─────────────────────────────────────────────────────────
 
@@ -516,17 +654,11 @@ if __name__ == "__main__":
     db = read_db()
     cfg = db.get("settings", {})
     main_port = cfg.get("port", 8080)
-    is_separate = cfg.get("separatePorts", False)
-    remote_port = cfg.get("remotePort", 8081)
 
     print("\n==============================================")
     print("  [>] ServManager - Python/FastAPI Backend")
     print(f"  [>] Admin Dashboard : http://localhost:{main_port}/")
-    if is_separate:
-        print(f"  [>] Remote Panel    : http://localhost:{remote_port}/")
-        threading.Thread(
-            target=start_remote_only_server, args=(remote_port,), daemon=True
-        ).start()
+    print(f"  [>] Mobile Remote   : http://localhost:{main_port}/remote")
     print("==============================================\n")
 
     uvicorn.run(app, host="0.0.0.0", port=main_port)

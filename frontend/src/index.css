@@ -1816,3 +1816,639 @@ select:focus {
   background: rgba(239, 68, 68, 0.2);
   border-color: var(--status-danger);
 }
+
+/* ─────────────────────────────────────────────────────────
+   Code Editor with Gutter / Line Numbers
+   ───────────────────────────────────────────────────────── */
+
+.code-editor-wrap {
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #05070e;
+}
+
+.code-editor-gutter {
+  background: #060a12;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 44px;
+  padding: 0.9rem 0;
+  overflow: hidden;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.code-line-num {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.2);
+  text-align: right;
+  padding: 0 0.6rem;
+  line-height: 1.5;
+  height: 1.35rem;
+}
+
+.code-editor-area {
+  flex: 1;
+  font-family: var(--font-mono) !important;
+  font-size: 0.9rem !important;
+  line-height: 1.5 !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0.9rem 1rem !important;
+  color: #d4cfc8 !important;
+  resize: vertical;
+  tab-size: 2;
+  outline: none;
+}
+
+.code-editor-area:focus {
+  box-shadow: none !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Toast Notifications
+   ───────────────────────────────────────────────────────── */
+
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 500;
+  pointer-events: all;
+  animation: toastIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  max-width: 340px;
+  border: 1px solid transparent;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  backdrop-filter: blur(12px);
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.toast-success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
+.toast-error {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.toast-info {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+}
+
+.toast-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0 0.2rem;
+  line-height: 1;
+  width: auto;
+  height: auto;
+}
+
+.toast-close:hover { opacity: 1; }
+
+/* ─────────────────────────────────────────────────────────
+   SSH Terminal Overlay (xterm.js)
+   ───────────────────────────────────────────────────────── */
+
+.ssh-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9998;
+  padding: 1rem;
+}
+
+.ssh-terminal-card {
+  width: 100%;
+  max-width: 960px;
+  height: 80vh;
+  background: #0a0a0a;
+  border: 1px solid rgba(196, 92, 26, 0.25);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04);
+  animation: modalScale 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ssh-terminal-header {
+  background: #111;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 0.65rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.ssh-terminal-info {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.85rem;
+}
+
+.ssh-terminal-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 0.5rem;
+}
+
+.ssh-terminal-body .xterm {
+  height: 100%;
+}
+
+.ssh-terminal-body .xterm-viewport {
+  overflow-y: auto !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   QR Code Panel
+   ───────────────────────────────────────────────────────── */
+
+.qr-panel {
+  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.qr-container {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.qr-code-wrap {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(196, 92, 26, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  flex-shrink: 0;
+}
+
+.qr-info {
+  flex: 1;
+  min-width: 220px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Stats Info Row (hostname / uptime chips)
+   ───────────────────────────────────────────────────────── */
+
+.stats-info-row {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.info-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem !important;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Auth logo / Pin logo
+   ───────────────────────────────────────────────────────── */
+
+.auth-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.auth-logo svg {
+  width: 40px;
+  height: 40px;
+  color: var(--primary);
+}
+
+.pin-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.pin-logo svg {
+  width: 36px;
+  height: 36px;
+  color: var(--primary);
+}
+
+.pin-display.shake {
+  animation: pin-shake 0.5s ease;
+}
+
+@keyframes pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+
+/* ─────────────────────────────────────────────────────────
+   Remote widget – body layout, action hint, status badge
+   ───────────────────────────────────────────────────────── */
+
+.widget-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.size-medium .widget-body {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.widget-action-hint {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  margin-top: 0.3rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.widget-status-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-top: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.widget-status-badge.success {
+  background: rgba(16,185,129,0.15);
+  color: var(--status-success);
+}
+
+.widget-status-badge.danger {
+  background: rgba(239,68,68,0.15);
+  color: var(--status-danger);
+}
+
+.widget-status-badge.inactive {
+  background: rgba(148,163,184,0.08);
+  color: var(--text-dim);
+}
+
+.indicator-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.widget-icon-wrap.sm {
+  width: 32px;
+  height: 32px;
+}
+
+.widget-icon-wrap.sm svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* SSH / type-specific widget backgrounds */
+.remote-widget.type-ssh {
+  cursor: pointer;
+}
+
+.remote-widget.type-button:hover,
+.remote-widget.type-ssh:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+/* Extra accent colors */
+.remote-widget.accent-cyan {
+  border: 1px solid rgba(6, 182, 212, 0.15);
+  box-shadow: 0 4px 24px rgba(6, 182, 212, 0.05);
+}
+
+.remote-widget.accent-cyan svg { color: #06b6d4; }
+
+.remote-widget.accent-orange {
+  border: 1px solid rgba(196, 92, 26, 0.25);
+  box-shadow: 0 4px 24px rgba(196, 92, 26, 0.08);
+}
+
+.remote-widget.accent-orange svg { color: var(--primary); }
+
+.preview-widget.accent-cyan  { border-left: 3px solid #06b6d4; }
+.preview-widget.accent-orange { border-left: 3px solid var(--primary); }
+
+/* ─────────────────────────────────────────────────────────
+   Script card extras
+   ───────────────────────────────────────────────────────── */
+
+.script-last-output {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 4px;
+  padding: 0.5rem;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 54px;
+  margin-bottom: 0.5rem;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Workflow Designer extras
+   ───────────────────────────────────────────────────────── */
+
+.step-name-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed rgba(255,255,255,0.15);
+  border-radius: 0;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0 0.25rem;
+  width: auto;
+  min-width: 100px;
+}
+
+.step-name-input:focus {
+  border-color: var(--primary);
+  box-shadow: none;
+}
+
+.btn.btn-icon.sm {
+  width: 28px;
+  height: 28px;
+  padding: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.workflow-step-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 3px;
+  padding: 0.2rem 0.4rem;
+  color: var(--text-muted);
+}
+
+.step-num {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--primary);
+  min-width: 14px;
+}
+
+.step-more {
+  color: var(--text-dim);
+  background: none;
+}
+
+.editor-form-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.workflow-designer-card {
+  width: 100%;
+  overflow: visible;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Remote designer header actions
+   ───────────────────────────────────────────────────────── */
+
+.designer-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* ─────────────────────────────────────────────────────────
+   History card
+   ───────────────────────────────────────────────────────── */
+
+.history-card {
+  width: 100%;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Settings - systemd instructions
+   ───────────────────────────────────────────────────────── */
+
+.service-setup-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.service-setup-instructions h5 {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Icon picker grid (widget designer)
+   ───────────────────────────────────────────────────────── */
+
+.icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.icon-pick-btn {
+  width: 36px;
+  height: 36px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+  padding: 0;
+}
+
+.icon-pick-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  border-color: rgba(255,255,255,0.2);
+}
+
+.icon-pick-btn.selected {
+  background: rgba(196, 92, 26, 0.2);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Header status row (remote)
+   ───────────────────────────────────────────────────────── */
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Misc utility additions
+   ───────────────────────────────────────────────────────── */
+
+label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+textarea {
+  resize: vertical;
+}
+
+select option {
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.text-danger {
+  color: var(--status-danger) !important;
+}
+
+.text-muted {
+  color: var(--text-muted) !important;
+}
+
+.text-dim {
+  color: var(--text-dim) !important;
+}
+
+@keyframes spinner {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─────────────────────────────────────────────────────────
+   Responsive tweaks
+   ───────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .dashboard-container {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .main-content {
+    padding: 1.25rem;
+  }
+
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .designer-layout-container {
+    grid-template-columns: 1fr;
+  }
+
+  .designer-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .section-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .qr-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .ssh-terminal-card {
+    height: 90vh;
+  }
+
+  .scripts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .script-card {
+    height: auto;
+    min-height: 200px;
+  }
+}

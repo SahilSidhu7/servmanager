@@ -13,50 +13,7 @@ DEFAULT_DATA = {
             "name": "Server Health Diagnostics",
             "description": "Checks CPU load, free memory, and root disk usage. Signals warning if resources are critically low.",
             "type": "shell",
-            "content": """#!/bin/bash
-echo "=== SERVER HEALTH CHECK ==="
-echo "Timestamp: $(date)"
-
-# 1. CPU Load
-CPU_LOAD=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk '{print 100 - $1}')
-echo "CPU Usage: $CPU_LOAD%"
-
-# 2. RAM Usage
-RAM_FREE=$(free -m | awk '/Mem:/ {print $4}')
-RAM_TOTAL=$(free -m | awk '/Mem:/ {print $2}')
-RAM_USAGE_PCT=$(free | awk '/Mem:/ {printf "%.2f", $3/$2 * 100}')
-echo "RAM Usage: $RAM_USAGE_PCT% ($((RAM_TOTAL - RAM_FREE))MB / ${RAM_TOTAL}MB)"
-
-# 3. Disk Space (Root)
-DISK_USAGE_PCT=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
-DISK_FREE=$(df -h / | awk 'NR==2 {print $4}')
-echo "Disk Usage (Root): $DISK_USAGE_PCT% (Free: $DISK_FREE)"
-
-# 4. Check status
-STATUS="OK"
-# For shell arithmetic we check thresholds
-if [ -n "$CPU_LOAD" ] && [ "$(echo "$CPU_LOAD > 90" | bc -l 2>/dev/null)" = "1" ]; then
-  echo "[WARN] High CPU load: $CPU_LOAD%"
-  STATUS="WARN"
-fi
-
-if [ -n "$RAM_USAGE_PCT" ] && [ "$(echo "$RAM_USAGE_PCT > 90" | bc -l 2>/dev/null)" = "1" ]; then
-  echo "[WARN] High RAM usage: $RAM_USAGE_PCT%"
-  STATUS="WARN"
-fi
-
-if [ -n "$DISK_USAGE_PCT" ] && [ "$DISK_USAGE_PCT" -gt 85 ]; then
-  echo "[WARN] High Disk usage: $DISK_USAGE_PCT%"
-  STATUS="WARN"
-fi
-
-echo "STATUS: $STATUS"
-if [ "$STATUS" = "OK" ]; then
-  exit 0
-else
-  exit 1
-fi
-""",
+            "content": "#!/bin/bash\necho \"=== SERVER HEALTH CHECK ===\"\necho \"Timestamp: $(date)\"\n\n# CPU Load\nCPU_LOAD=$(top -bn1 | grep \"Cpu(s)\" | sed \"s/.*, *\\([0-9.]*\\)%* id.*/\\1/\" | awk '{print 100 - $1}')\necho \"CPU Usage: $CPU_LOAD%\"\n\n# RAM Usage\nRAM_FREE=$(free -m | awk '/Mem:/ {print $4}')\nRAM_TOTAL=$(free -m | awk '/Mem:/ {print $2}')\nRAM_USAGE_PCT=$(free | awk '/Mem:/ {printf \"%.2f\", $3/$2 * 100}')\necho \"RAM Usage: $RAM_USAGE_PCT% ($((RAM_TOTAL - RAM_FREE))MB / ${RAM_TOTAL}MB)\"\n\n# Disk Space (Root)\nDISK_USAGE_PCT=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')\nDISK_FREE=$(df -h / | awk 'NR==2 {print $4}')\necho \"Disk Usage (Root): $DISK_USAGE_PCT% (Free: $DISK_FREE)\"\n\nSTATUS=\"OK\"\nif [ -n \"$CPU_LOAD\" ] && [ \"$(echo \"$CPU_LOAD > 90\" | bc -l 2>/dev/null)\" = \"1\" ]; then\n  echo \"[WARN] High CPU load: $CPU_LOAD%\"\n  STATUS=\"WARN\"\nfi\nif [ -n \"$RAM_USAGE_PCT\" ] && [ \"$(echo \"$RAM_USAGE_PCT > 90\" | bc -l 2>/dev/null)\" = \"1\" ]; then\n  echo \"[WARN] High RAM usage: $RAM_USAGE_PCT%\"\n  STATUS=\"WARN\"\nfi\nif [ -n \"$DISK_USAGE_PCT\" ] && [ \"$DISK_USAGE_PCT\" -gt 85 ]; then\n  echo \"[WARN] High Disk usage: $DISK_USAGE_PCT%\"\n  STATUS=\"WARN\"\nfi\n\necho \"STATUS: $STATUS\"\nif [ \"$STATUS\" = \"OK\" ]; then\n  exit 0\nelse\n  exit 1\nfi\n",
             "isIndicator": True,
             "isButton": False,
             "interval": 10,
@@ -69,20 +26,7 @@ fi
             "name": "Serving Ports Scanner",
             "description": "Lists all open TCP and UDP listening ports and maps them to running processes.",
             "type": "shell",
-            "content": """#!/bin/bash
-echo "=== ACTIVE LISTENING PORTS ==="
-echo "Scanning for listening sockets..."
-echo ""
-
-if command -v ss >/dev/null 2>&1; then
-  ss -tuln
-else
-  netstat -tuln
-fi
-
-echo ""
-echo "Scan complete."
-""",
+            "content": "#!/bin/bash\necho \"=== ACTIVE LISTENING PORTS ===\"\necho \"Scanning for listening sockets...\"\necho \"\"\n\nif command -v ss >/dev/null 2>&1; then\n  ss -tuln\nelse\n  netstat -tuln\nfi\n\necho \"\"\necho \"Scan complete.\"\n",
             "isIndicator": False,
             "isButton": True,
             "interval": 30,
@@ -130,6 +74,7 @@ echo "Scan complete."
             {
                 "id": "widget-1",
                 "title": "CPU Usage",
+                "description": "Average core load",
                 "type": "metric",
                 "metricType": "cpu",
                 "size": "small",
@@ -140,6 +85,7 @@ echo "Scan complete."
             {
                 "id": "widget-2",
                 "title": "RAM Usage",
+                "description": "Memory consumption",
                 "type": "metric",
                 "metricType": "ram",
                 "size": "small",
@@ -150,6 +96,7 @@ echo "Scan complete."
             {
                 "id": "widget-3",
                 "title": "Server Diagnostics",
+                "description": "Health check status",
                 "type": "indicator",
                 "scriptId": "default-health-check",
                 "size": "medium",
@@ -160,6 +107,7 @@ echo "Scan complete."
             {
                 "id": "widget-4",
                 "title": "Scan Server Ports",
+                "description": "List listening ports",
                 "type": "button",
                 "scriptId": "default-ports-scanner",
                 "size": "small",
@@ -170,6 +118,7 @@ echo "Scan complete."
             {
                 "id": "widget-5",
                 "title": "Services Checker",
+                "description": "Check running daemons",
                 "type": "button",
                 "scriptId": "default-services-monitor",
                 "size": "small",
@@ -179,10 +128,9 @@ echo "Scan complete."
             }
         ]
     },
+    "sshConnections": [],
     "settings": {
         "port": 8080,
-        "separatePorts": False,
-        "remotePort": 8081,
         "secretToken": secrets.token_hex(16),
         "username": "admin",
         "password": "admin",
@@ -224,7 +172,7 @@ def update_db(updater_fn) -> dict:
             else:
                 with open(DATA_FILE, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-            
+
             updater_fn(data)
             write_db_unlocked(data)
             return data

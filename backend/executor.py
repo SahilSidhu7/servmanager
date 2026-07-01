@@ -7,9 +7,32 @@ import urllib.error
 import random
 import time
 
-SCRATCH_DIR = os.path.join(os.getcwd(), 'scratch')
-if not os.path.exists(SCRATCH_DIR):
-    os.makedirs(SCRATCH_DIR, exist_ok=True)
+# Always resolve scratch dir relative to this file so it works
+# regardless of what cwd uvicorn was launched from.
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRATCH_DIR = os.path.join(_BASE_DIR, '..', 'scratch')
+SCRATCH_DIR = os.path.abspath(SCRATCH_DIR)
+
+def _get_writable_scratch_dir(path: str) -> str:
+    try:
+        os.makedirs(path, exist_ok=True)
+        # Verify it is actually writable by writing a small test file
+        test_file = os.path.join(path, '.write_test')
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.unlink(test_file)
+        return path
+    except Exception:
+        import tempfile
+        fallback_path = os.path.join(tempfile.gettempdir(), 'servmanager-scratch')
+        try:
+            os.makedirs(fallback_path, exist_ok=True)
+            return fallback_path
+        except Exception:
+            return tempfile.gettempdir()
+
+SCRATCH_DIR = _get_writable_scratch_dir(SCRATCH_DIR)
+
 
 # Helper to check if a TCP port is active (listening)
 async def check_tcp_port(port: int) -> bool:
@@ -139,10 +162,11 @@ class ScriptExecutor:
                         f.write(clean_content)
                     
                     # Remove original temp file
-                    try:
-                        os.unlink(temp_file)
-                    except Exception:
-                        pass
+                    if temp_file != bat_file:
+                        try:
+                            os.unlink(temp_file)
+                        except Exception:
+                            pass
                     
                     temp_file = bat_file
                     self.active_processes[run_id]["temp_file"] = temp_file
@@ -237,12 +261,18 @@ class ScriptExecutor:
                         sub_run_id = f"{run_id}_step_{current_step_index}"
                         self.active_processes[run_id]["current_child_run_id"] = sub_run_id
                         
+                        cmd_output_lines = []
+                        def cmd_log(log_line):
+                            cmd_output_lines.append(log_line)
+                            on_log(f"  | {log_line}")
+
                         # Execute command
-                        res = await self.run_shell(sub_run_id, cmd, lambda log: on_log(f"  | {log}"))
+                        res = await self.run_shell(sub_run_id, cmd, cmd_log)
                         
                         self.active_processes[run_id]["current_child_run_id"] = None
                         step_code = res.get("code", 0)
                         step_success = res.get("status") == 'success'
+                        step_output = "".join(cmd_output_lines)
                         
                 elif step_type == 'check_port':
                     port_val = config.get("port")

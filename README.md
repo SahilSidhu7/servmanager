@@ -1,43 +1,35 @@
 # ServManager
 
-**ServManager** is a powerful, self-hosted web-based server administration dashboard and remote control tool. Built with an asynchronous Python FastAPI backend and a premium, responsive React UI, it enables you to monitor server health, chain together custom workflow automation, and run ad-hoc scripts directly from your browser — and from your phone.
+**ServManager** is a self-hosted web-based server administration dashboard and mobile remote. Built with a Python FastAPI backend and a React frontend, it lets you monitor server health, write and run shell scripts, chain workflow automation steps, open SSH terminals in your browser, and control everything from your phone — all through a single port.
 
 ---
 
 ## Features
 
-- 📊 **Real-time Diagnostics** — Live CPU, RAM, and disk storage tracking via WebSocket push.
-- 🌐 **Network Port Scanner** — View all active listening TCP/UDP ports mapped to your system.
-- 💻 **Script Editor** — Create and execute custom Linux shell scripts directly from the web interface.
-- 🔗 **Workflow Assembler** — Chain sequential commands, HTTP requests, port checks, and logical conditional branches.
-- 📱 **Mobile-Friendly Remote** — A drag-and-drop customizable grid dashboard for triggering workflows from your phone.
-- 🔒 **Credential-Based Auth** — Username & password login for the admin dashboard; a 4-digit PIN for the mobile remote panel.
-- 🔄 **Background Polling** — Scripts can be run continuously in the background to serve as live indicator badges.
-- 🎨 **Themeable Design** — All design tokens are centralized in `frontend/src/theme.css` for instant theme swaps.
-- 🛠️ **CLI Helper** — A `servmanager` command installed on the system for managing the service, updating, and changing settings from the terminal.
+- **Real-time Stats** — Live CPU, RAM, and disk tracking pushed over WebSocket.
+- **Script Editor** — Write and run shell scripts in the browser with a full code editor (line numbers, Tab indentation, auto-indent).
+- **Workflow Builder** — Chain shell commands, HTTP requests, TCP port checks, delays, and conditional branches into multi-step automation sequences.
+- **SSH Terminal** — Save SSH credentials in the app and open a full xterm.js terminal session in any browser — desktop or phone.
+- **Mobile Remote Panel** — A drag-and-drop customizable widget grid served at `/remote`. Supports button, indicator, live metric, and SSH launcher widgets.
+- **QR Code Sharing** — After saving your remote layout, a QR code appears for scanning directly from your phone.
+- **Auth Layers** — Username + password for the admin dashboard; a 4-digit PIN for the mobile remote.
+- **Background Polling** — Scripts can run on a schedule and push live status badges to all connected clients.
+- **Single Port** — Admin dashboard at `/` and mobile remote at `/remote` both served by the same FastAPI process on port 8080. No separate server needed.
+- **Zero Database** — All data stored in a single `data.json` file.
 
 ---
 
-## Installation (Debian/Ubuntu)
+## Installation (Debian / Ubuntu)
 
-ServManager supports two installation methods.
-
-### Method 1: One-liner (Auto-fetches Latest Release)
-
-Run this single command on your server — no manual downloading required:
+### Method 1: One-liner
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/sahilsidhu7/servmanager/main/install.sh | sudo bash
 ```
 
-The installer automatically:
-- Detects and installs system dependencies (`python3`, `nodejs`, `npm`, `curl`)
-- Downloads the latest release from GitHub if no local source is found
-- Builds the React frontend and sets up the Python virtual environment
-- Writes the `systemd` service file and enables autostart
-- Installs the `servmanager` CLI command to `/usr/local/bin/servmanager`
+This automatically installs system dependencies (`python3`, `nodejs`, `npm`), builds the React frontend, sets up a Python virtual environment, writes a `systemd` service, and installs the `servmanager` CLI command.
 
-### Method 2: Install from Source
+### Method 2: From Source
 
 ```bash
 git clone https://github.com/sahilsidhu7/servmanager.git
@@ -45,9 +37,7 @@ cd servmanager
 sudo ./install.sh
 ```
 
-### Method 3: Install via APT (`.deb` Package)
-
-Download and install using `apt`:
+### Method 3: `.deb` Package
 
 ```bash
 # Replace <version> with the latest tag from the Releases page
@@ -59,106 +49,103 @@ sudo apt install ./servmanager_<version>_all.deb
 
 ## First Login
 
-After installation, navigate to:
+After installation, open:
 
 ```
 http://YOUR_SERVER_IP:8080/
 ```
 
-**Default Admin Credentials:**
+**Default credentials:**
 
 | Field    | Default |
 |----------|---------|
 | Username | `admin` |
 | Password | `admin` |
 
-> ⚠️ **Change these immediately** after your first login via the **Settings** tab.
+> **Change these immediately** in the Settings tab after first login.
 
 ---
 
-## Mobile Remote Panel
-
-Access the simplified mobile-optimized control pad at:
+## Mobile Remote
 
 ```
 http://YOUR_SERVER_IP:8080/remote
 ```
 
-You will be prompted to enter a **4-digit PIN** to access the remote panel.
+Default PIN: `1234` — change it in Settings.
 
-**Default Remote PIN:** `1234`
+After saving your remote layout in the Designer tab, a QR code appears. Scan it to open the remote panel directly on your phone.
 
-> ⚠️ Change this in the **Settings** tab of the admin dashboard.
+---
+
+## SSH Terminal
+
+Go to the **SSH Connections** tab, add a host with credentials, then click **Connect** to open a full terminal in your browser. Works on desktop and mobile.
+
+**Requires `asyncssh`** — the installer handles this automatically. If you're running from source:
+
+```bash
+pip install asyncssh
+```
+
+If `asyncssh` is not installed, the rest of the app starts fine and shows a friendly error only when you try to open an SSH session.
 
 ---
 
 ## CLI Helper (`servmanager`)
 
-After installation, a `servmanager` command is available system-wide. All commands that modify the system require `sudo`.
+A `servmanager` command is installed system-wide after running the installer. All commands that modify the system require `sudo`.
 
 ### Service Management
 
 ```bash
-sudo servmanager start       # Start the service
-sudo servmanager stop        # Stop the service
-sudo servmanager restart     # Restart the service
-sudo servmanager status      # Show systemd service status
-sudo servmanager enable      # Enable autostart on boot
-sudo servmanager disable     # Disable autostart on boot
-sudo servmanager logs        # Tail live service logs
+sudo servmanager start
+sudo servmanager stop
+sudo servmanager restart
+sudo servmanager status
+sudo servmanager enable      # autostart on boot
+sudo servmanager disable
+sudo servmanager logs        # tail live logs
 ```
 
 ### Configuration
 
 ```bash
-# Change the dashboard port (updates config + systemd + restarts)
-sudo servmanager set-port 9090
-
-# Change the mobile remote PIN (4 digits)
-sudo servmanager set-pin 5678
-
-# Change admin username and password
+sudo servmanager set-port 9090       # change dashboard port
+sudo servmanager set-pin 5678        # change remote PIN (4 digits)
 sudo servmanager set-auth myuser mysecurepassword
 ```
 
 ### Maintenance
 
 ```bash
-# Update to the latest release from GitHub (auto-downloads & reinstalls)
-sudo servmanager update
-
-# Show installation paths and dashboard URLs
-sudo servmanager info
-
-# Show installed version
+sudo servmanager update    # pull latest release from GitHub
+sudo servmanager info      # show install paths and URLs
 sudo servmanager version
-
-# Show all commands
 sudo servmanager help
 ```
 
 ---
 
-## Remote Dashboard Designer — Drag & Drop
+## Remote Designer
 
-In the **Designer** tab, you can build a custom layout for the mobile remote panel:
+In the **Designer** tab:
 
-1. Use the **Layout Block Library** panel to add new widgets (buttons, indicators, live metrics).
-2. In the **Remote Interface Mockup** grid, **drag widgets** to reorder them — grab the ✛ handle on the top-left of each widget card.
-3. Click **Save Layout Config** to persist your layout.
-4. Open the remote panel on your phone to see the changes live.
+1. Pick a widget type from the library (button, indicator, metric, SSH launcher).
+2. Drag widgets in the grid to reorder them using the ✛ handle.
+3. Click **Save Layout** to persist. A QR code appears — scan it with your phone.
 
 ---
 
 ## Customizing the Theme
 
-All visual design tokens are centralized in a single file:
+All design tokens live in one file:
 
 ```
 frontend/src/theme.css
 ```
 
-To change the theme, simply edit the CSS variables in that file and rebuild the frontend:
+Edit the CSS variables, then rebuild:
 
 ```bash
 cd /opt/servmanager/frontend
@@ -166,51 +153,54 @@ npm run build
 sudo servmanager restart
 ```
 
-Key variables you can adjust:
+Key variables:
 
 | Variable | Purpose |
 |---|---|
-| `--bg-dark` | Main page background |
-| `--primary` | Primary accent colour |
-| `--primary-glow` | Gradient used on buttons and headings |
-| `--accent` | Secondary highlight colour |
-| `--radius-md` | Card border radius |
-| `--font-sans` | Body font family |
-| `--font-mono` | Code/terminal font family |
+| `--bg-dark` | Page background (`#111111`) |
+| `--bg-paper` | Sidebar / panels |
+| `--bg-card` | Card backgrounds |
+| `--primary` | Accent color (`#c45c1a` burnt orange) |
+| `--primary-light` | Hover / highlight variant |
+| `--text-main` | Body text |
+| `--text-muted` | Secondary text |
+| `--border-color` | Card / element borders |
+| `--font-sans` | Body font (IBM Plex Mono) |
+| `--font-mono` | Code / terminal font |
+| `--radius-md` | Border radius (`0px` by default — square) |
 
 ---
 
-## Settings
+## Settings Tab
 
-From the **Settings** tab in the admin dashboard you can configure:
+From the **Settings** tab you can configure:
 
-- **Network Ports** — Change the dashboard or dedicated remote port
-- **Admin Credentials** — Update your username and password
-- **Remote PIN** — Update the 4-digit PIN for phone access
-- **API Token** — View the internal API security token
+- **Port** — Change the port ServManager listens on (both admin and remote share it).
+- **Admin Credentials** — Update username and password.
+- **Remote PIN** — Update the 4-digit PIN for phone access.
+- **API Token** — Copy the internal security token.
 
 ---
 
 ## Project Architecture
 
-- **Backend:** Python (FastAPI, uvicorn, asyncio, psutil)
-- **Frontend:** React, Vite, Vanilla CSS
-- **Communication:** REST APIs + WebSockets for real-time log streaming and indicator updates
-- **Persistence:** Local JSON file storage (`data.json`) — zero database overhead
-- **Theme System:** `frontend/src/theme.css` for single-file theme customization
+- **Backend:** Python — FastAPI, uvicorn, asyncio, psutil, asyncssh
+- **Frontend:** React 19, Vite, Vanilla CSS
+- **Communication:** REST + WebSocket (real-time stats, log streaming, SSH terminal proxy)
+- **Persistence:** `data.json` — no database
+- **Theme:** `frontend/src/theme.css` — single file, all CSS variables
 
 ---
 
-## Contributing
-
-Pull requests are welcome! For local development:
+## Local Development
 
 ```bash
-# Start the backend
+# Terminal 1 — backend
 cd backend
+pip install -r requirements.txt
 python -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
-# Start the frontend dev server (in a separate terminal)
+# Terminal 2 — frontend
 cd frontend
 npm install
 npm run dev
