@@ -426,9 +426,6 @@ async def api_get_settings():
 
 @app.post("/api/settings", dependencies=[Depends(verify_token)])
 async def api_save_settings(settings: dict):
-    settings.pop("separatePorts", None)
-    settings.pop("remotePort", None)
-
     def updater(db):
         db.setdefault("settings", {}).update(settings)
     update_db(updater)

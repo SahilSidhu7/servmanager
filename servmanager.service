@@ -1,15 +1,15 @@
 [Unit]
-Description=ServManager - Web-based Server Controller and Monitor
+Description=ServManager – Python FastAPI Server Management Dashboard
 After=network.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/servmanager
-ExecStart=/usr/bin/node server.js
-Restart=always
-RestartSec=3
-Environment=NODE_ENV=production
+WorkingDirectory=/opt/servmanager/backend
+ExecStart=/opt/servmanager/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8080
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target

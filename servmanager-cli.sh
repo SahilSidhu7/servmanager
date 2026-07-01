@@ -174,6 +174,7 @@ print('Credentials updated.')
     TMP_DIR=$(mktemp -d)
     curl -sL "https://github.com/${GITHUB_REPO}/archive/refs/tags/${LATEST}.tar.gz" -o "$TMP_DIR/servmanager.tar.gz"
     tar -xzf "$TMP_DIR/servmanager.tar.gz" -C "$TMP_DIR" --strip-components=1
+    echo "$LATEST" > "$TMP_DIR/VERSION"
 
     echo -e "${CYAN}[>] Running installer to upgrade in-place...${NC}"
     bash "$TMP_DIR/install.sh"
@@ -183,17 +184,12 @@ print('Credentials updated.')
     ;;
 
   version)
-    require_data
-    VERSION=$("$VENV_PYTHON" -c "
-import json
-try:
-    with open('$DATA_FILE') as f:
-        d = json.load(f)
-    print(d.get('settings', {}).get('version', 'unknown'))
-except:
-    print('unknown')
-" 2>/dev/null || echo "unknown")
-    echo -e "${CYAN}ServManager version: ${GREEN}${VERSION}${NC}"
+    VER_FILE="$INSTALL_DIR/VERSION"
+    if [ -f "$VER_FILE" ]; then
+      echo -e "${CYAN}ServManager version: ${GREEN}$(cat $VER_FILE)${NC}"
+    else
+      echo -e "${YELLOW}Version file not found. Re-run installer to fix.${NC}"
+    fi
     ;;
 
   info)

@@ -60,6 +60,15 @@ if [ ! -f "$SRC_DIR/backend/main.py" ]; then
   echo -e "${GREEN}[OK] Source downloaded to $TMP_SRC${NC}"
 fi
 
+# Resolve version string for VERSION file
+if [ -n "$LATEST" ]; then
+  SM_VERSION="$LATEST"
+elif [ -f "$SRC_DIR/VERSION" ]; then
+  SM_VERSION=$(cat "$SRC_DIR/VERSION")
+else
+  SM_VERSION="dev"
+fi
+
 # ─────────────────────────────────────────────────────────────
 # 2. System packages
 # ─────────────────────────────────────────────────────────────
@@ -131,6 +140,7 @@ echo -e "${YELLOW}[5/7] Building React frontend assets...${NC}"
 cd "$INSTALL_DIR/frontend"
 npm install --silent --no-audit --no-fund
 npm run build --silent
+echo "$SM_VERSION" > "$INSTALL_DIR/VERSION"
 echo -e "${GREEN}[OK] React frontend compiled and ready.${NC}"
 
 # ─────────────────────────────────────────────────────────────
@@ -141,8 +151,8 @@ cd "$INSTALL_DIR"
 
 if [ ! -f "$INSTALL_DIR/data.json" ]; then
   echo -e "${CYAN}Generating initial configuration with default credentials...${NC}"
-  "$VENV_DIR/bin/python3" -c "
-import json, secrets, os
+  TOKEN=$("$VENV_DIR/bin/python3" -c "
+import json, secrets
 token = secrets.token_urlsafe(32)
 data = {
   'scripts': [],
@@ -150,8 +160,6 @@ data = {
   'remote': {'widgets': []},
   'settings': {
     'port': 8080,
-    'separatePorts': False,
-    'remotePort': 8081,
     'secretToken': token,
     'username': 'admin',
     'password': 'admin',
@@ -161,9 +169,7 @@ data = {
 with open('$INSTALL_DIR/data.json', 'w') as f:
     json.dump(data, f, indent=2)
 print(token)
-" > /tmp/sm_token.txt
-  TOKEN=$(cat /tmp/sm_token.txt)
-  rm -f /tmp/sm_token.txt
+")
   FIRST_RUN=1
 else
   echo -e "${CYAN}Existing configuration detected. Preserving user data...${NC}"
@@ -297,9 +303,17 @@ with open('$DATA_FILE','w') as f: json.dump(d,f,indent=2)
     TMP_DIR=$(mktemp -d)
     curl -sL "https://github.com/${GITHUB_REPO}/archive/refs/tags/${LATEST}.tar.gz" -o "$TMP_DIR/sm.tar.gz"
     tar -xzf "$TMP_DIR/sm.tar.gz" -C "$TMP_DIR" --strip-components=1
+    echo "$LATEST" > "$TMP_DIR/VERSION"
     bash "$TMP_DIR/install.sh"
     rm -rf "$TMP_DIR"
     echo -e "${GREEN}[OK] Updated to $LATEST${NC}" ;;
+  version)
+    VER_FILE="/opt/servmanager/VERSION"
+    if [ -f "$VER_FILE" ]; then
+      echo -e "${CYAN}ServManager version: ${GREEN}$(cat $VER_FILE)${NC}"
+    else
+      echo -e "${YELLOW}Version file not found. Re-run installer to fix.${NC}"
+    fi ;;
   info)
     require_data
     PORT=$("$VENV_PYTHON" -c "import json; print(json.load(open('$DATA_FILE')).get('settings',{}).get('port',8080))" 2>/dev/null || echo 8080)
@@ -313,7 +327,7 @@ with open('$DATA_FILE','w') as f: json.dump(d,f,indent=2)
     echo ""
     echo -e "  ${YELLOW}Service:${NC}  start | stop | restart | status | enable | disable | logs"
     echo -e "  ${YELLOW}Config: ${NC}  set-port <n> | set-pin <4-digits> | set-auth <user> <pass>"
-    echo -e "  ${YELLOW}Other:  ${NC}  update | info | help"
+    echo -e "  ${YELLOW}Other:  ${NC}  update | version | info | help"
     echo "" ;;
   *)
     echo -e "${RED}Unknown command: $1${NC}  —  run: servmanager help"; exit 1 ;;
@@ -342,7 +356,12 @@ if [ "$FIRST_RUN" = "1" ]; then
   echo ""
 fi
 
-read -p "Enable ServManager to start automatically on boot? (y/n): " AUTOSTART
+if [ -t 0 ]; then
+  read -p "Enable ServManager to start automatically on boot? (y/n): " AUTOSTART
+else
+  AUTOSTART=y
+  echo -e "${CYAN}[>] Non-interactive install — enabling service autostart.${NC}"
+fi
 
 if [[ "$AUTOSTART" =~ ^[Yy]$ ]]; then
   systemctl enable servmanager
