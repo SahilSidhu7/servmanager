@@ -6,31 +6,29 @@ from contextlib import asynccontextmanager
 from typing import Dict, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 
-from database import read_db, update_db
+from database import read_db, update_db, hash_password, verify_password
 from system_monitor import get_system_stats, get_active_ports
 from executor import ScriptExecutor
 
 
+background_tasks: Set[asyncio.Task] = set()
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    asyncio.create_task(stats_broadcast_loop())
+    task = asyncio.create_task(stats_broadcast_loop())
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
     start_schedulers()
     yield
+    for t in list(background_tasks) + list(active_tasks.values()):
+        t.cancel()
 
 
-app = FastAPI(title="ServManager Admin", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="ServManager", lifespan=lifespan)
 
 executor = ScriptExecutor()
 
@@ -56,105 +54,143 @@ class ConnectionManager:
             if not self.log_subscribers[run_id]:
                 del self.log_subscribers[run_id]
 
-    async def subscribe_stats(self, websocket: WebSocket):
+    def subscribe_stats(self, websocket: WebSocket):
         self.stats_subscribers.add(websocket)
 
     def unsubscribe_stats(self, websocket: WebSocket):
         self.stats_subscribers.discard(websocket)
 
-    async def subscribe_log(self, websocket: WebSocket, run_id: str):
-        if run_id not in self.log_subscribers:
-            self.log_subscribers[run_id] = set()
-        self.log_subscribers[run_id].add(websocket)
+    def subscribe_log(self, websocket: WebSocket, run_id: str):
+        self.log_subscribers.setdefault(run_id, set()).add(websocket)
+
+    async def _send_to(self, conns, payload: str):
+        dead = []
+        for conn in list(conns):
+            try:
+                await conn.send_text(payload)
+            except Exception:
+                dead.append(conn)
+        for conn in dead:
+            self.disconnect(conn)
 
     async def broadcast(self, message: dict):
-        payload = json.dumps(message)
-        dead = []
-        for conn in list(self.active_connections):
-            try:
-                await conn.send_text(payload)
-            except Exception:
-                dead.append(conn)
-        for conn in dead:
-            self.disconnect(conn)
+        await self._send_to(self.active_connections, json.dumps(message))
 
     async def broadcast_stats(self, stats_data: dict):
-        payload = json.dumps({"type": "stats", "data": stats_data})
-        dead = []
-        for conn in list(self.stats_subscribers):
-            try:
-                await conn.send_text(payload)
-            except Exception:
-                dead.append(conn)
-        for conn in dead:
-            self.disconnect(conn)
+        await self._send_to(self.stats_subscribers, json.dumps({"type": "stats", "data": stats_data}))
 
     async def broadcast_log(self, run_id: str, log_text: str):
         if run_id not in self.log_subscribers:
             return
         payload = json.dumps({"type": "log", "runId": run_id, "text": log_text})
-        dead = []
-        for conn in list(self.log_subscribers[run_id]):
-            try:
-                await conn.send_text(payload)
-            except Exception:
-                dead.append(conn)
-        for conn in dead:
-            self.disconnect(conn)
+        await self._send_to(self.log_subscribers[run_id], payload)
 
 
 manager = ConnectionManager()
 
 # ─────────────────────────────────────────────────────────
-# Token Authorization
+# Authentication
+#
+# Two tokens:
+#   - admin token (settings.secretToken): full access, returned by
+#     username/password login.
+#   - remote token (settings.remoteToken): limited access for the
+#     mobile remote, returned by PIN login. It can view stats and
+#     scripts and trigger runs, but cannot change anything.
 # ─────────────────────────────────────────────────────────
 
-def verify_token(request: Request):
-    if request.url.path in ["/api/login", "/api/remote/login"]:
-        return
-    if not request.url.path.startswith("/api/"):
-        return
-    db = read_db()
-    secret_token = db.get("settings", {}).get("secretToken", "")
-    if not secret_token:
-        return
-    token = request.query_params.get("token")
+def _request_token(request: Request) -> str:
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
-        token = auth_header.split(" ", 1)[1]
-    if token != secret_token:
-        raise HTTPException(status_code=401, detail="Unauthorized: Invalid access token")
+        return auth_header.split(" ", 1)[1]
+    return ""
+
+
+def _token_role(token: str) -> str:
+    if not token:
+        return ""
+    settings = read_db().get("settings", {})
+    if token == settings.get("secretToken", ""):
+        return "admin"
+    if token == settings.get("remoteToken", ""):
+        return "remote"
+    return ""
+
+
+def require_admin(request: Request):
+    if _token_role(_request_token(request)) != "admin":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def require_any(request: Request):
+    if not _token_role(_request_token(request)):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+# Simple in-memory login throttling: 5 failures per IP -> 60s lockout.
+_login_failures: Dict[str, dict] = {}
+_MAX_FAILURES = 5
+_LOCKOUT_SECONDS = 60
+
+
+def _check_lockout(ip: str):
+    entry = _login_failures.get(ip)
+    if entry and entry["count"] >= _MAX_FAILURES:
+        remaining = entry["locked_until"] - time.time()
+        if remaining > 0:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many failed attempts. Try again in {int(remaining) + 1}s.",
+            )
+        del _login_failures[ip]
+
+
+def _record_failure(ip: str):
+    entry = _login_failures.setdefault(ip, {"count": 0, "locked_until": 0})
+    entry["count"] += 1
+    if entry["count"] >= _MAX_FAILURES:
+        entry["locked_until"] = time.time() + _LOCKOUT_SECONDS
+
+
+def _clear_failures(ip: str):
+    _login_failures.pop(ip, None)
 
 
 @app.post("/api/login")
-async def api_login(payload: dict):
-    username = payload.get("username")
-    password = payload.get("password")
-    db = read_db()
-    settings = db.get("settings", {})
-    if username == settings.get("username", "admin") and password == settings.get("password", "admin"):
-        return {"success": True, "token": settings.get("secretToken", "")}
+async def api_login(payload: dict, request: Request):
+    ip = request.client.host if request.client else "unknown"
+    _check_lockout(ip)
+    username = payload.get("username") or ""
+    password = payload.get("password") or ""
+    settings = read_db().get("settings", {})
+    if username == settings.get("username", "admin") and verify_password(password, settings.get("password", "")):
+        _clear_failures(ip)
+        return {"success": True, "token": settings.get("secretToken", ""), "role": "admin"}
+    _record_failure(ip)
     raise HTTPException(status_code=401, detail="Invalid username or password")
 
 
 @app.post("/api/remote/login")
-async def api_remote_login(payload: dict):
-    pin = payload.get("pin")
-    db = read_db()
-    settings = db.get("settings", {})
-    if str(pin) == str(settings.get("remotePin", "1234")):
-        return {"success": True, "token": settings.get("secretToken", "")}
+async def api_remote_login(payload: dict, request: Request):
+    ip = request.client.host if request.client else "unknown"
+    _check_lockout(ip)
+    pin = str(payload.get("pin") or "")
+    settings = read_db().get("settings", {})
+    if pin and pin == str(settings.get("remotePin", "")):
+        _clear_failures(ip)
+        return {"success": True, "token": settings.get("remoteToken", ""), "role": "remote"}
+    _record_failure(ip)
     raise HTTPException(status_code=401, detail="Invalid PIN code")
 
 
 # ─────────────────────────────────────────────────────────
-# Background Indicator Scheduler
+# Scheduled script runner (scripts with interval > 0)
 # ─────────────────────────────────────────────────────────
 
 active_tasks: Dict[str, asyncio.Task] = {}
 
 
-async def run_indicator_task(script_id: str, interval_seconds: int):
+async def run_scheduled_script(script_id: str, interval_seconds: int):
     while True:
         try:
             db = read_db()
@@ -162,7 +198,7 @@ async def run_indicator_task(script_id: str, interval_seconds: int):
             if not script:
                 break
 
-            run_id = f"indicator_{script_id}_{int(time.time())}"
+            run_id = f"sched_{script_id}_{int(time.time())}"
             output_log = []
             loop = asyncio.get_event_loop()
 
@@ -189,12 +225,12 @@ async def run_indicator_task(script_id: str, interval_seconds: int):
                 "type": "indicator-update",
                 "scriptId": script_id,
                 "lastStatus": res["status"],
-                "lastOutput": complete_output,
+                "lastOutput": complete_output[:1000],
             })
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"[indicator] Error polling {script_id}: {e}")
+            print(f"[scheduler] Error running {script_id}: {e}")
 
         await asyncio.sleep(max(5, interval_seconds))
 
@@ -207,9 +243,9 @@ def start_schedulers():
     db = read_db()
     loop = asyncio.get_event_loop()
     for script in db.get("scripts", []):
-        if script.get("isIndicator") and script.get("interval", 0) > 0:
+        if script.get("interval", 0) > 0:
             task = loop.create_task(
-                run_indicator_task(script["id"], script["interval"])
+                run_scheduled_script(script["id"], script["interval"])
             )
             active_tasks[script["id"]] = task
 
@@ -218,17 +254,17 @@ def start_schedulers():
 # REST API — SYSTEM
 # ─────────────────────────────────────────────────────────
 
-@app.get("/api/system/stats", dependencies=[Depends(verify_token)])
+@app.get("/api/system/stats", dependencies=[Depends(require_any)])
 async def api_system_stats():
     return get_system_stats()
 
 
-@app.get("/api/system/ports", dependencies=[Depends(verify_token)])
+@app.get("/api/system/ports", dependencies=[Depends(require_admin)])
 async def api_system_ports():
     return get_active_ports()
 
 
-@app.get("/api/system/info", dependencies=[Depends(verify_token)])
+@app.get("/api/system/info", dependencies=[Depends(require_any)])
 async def api_system_info(request: Request):
     db = read_db()
     port = db.get("settings", {}).get("port", 8080)
@@ -244,42 +280,53 @@ async def api_system_info(request: Request):
 # REST API — SCRIPTS
 # ─────────────────────────────────────────────────────────
 
-@app.get("/api/scripts", dependencies=[Depends(verify_token)])
+@app.get("/api/scripts", dependencies=[Depends(require_any)])
 async def api_get_scripts():
-    db = read_db()
-    return db.get("scripts", [])
+    return read_db().get("scripts", [])
 
 
-@app.post("/api/scripts", dependencies=[Depends(verify_token)])
+@app.post("/api/scripts", dependencies=[Depends(require_admin)])
 async def api_save_script(script: dict):
-    if not script.get("name"):
+    name = (script.get("name") or "").strip()
+    if not name:
         raise HTTPException(status_code=400, detail="Script name is required")
 
+    try:
+        interval = max(0, int(script.get("interval") or 0))
+    except (TypeError, ValueError):
+        interval = 0
+    if 0 < interval < 5:
+        interval = 5
+
+    clean = {
+        "name": name,
+        "description": (script.get("description") or "").strip(),
+        "content": script.get("content") or "",
+        "interval": interval,
+    }
     script_id = script.get("id")
 
     def updater(db):
+        scripts = db.setdefault("scripts", [])
         if script_id:
-            idx = next((i for i, s in enumerate(db["scripts"]) if s["id"] == script_id), -1)
-            if idx != -1:
-                db["scripts"][idx].update(script)
-            else:
-                db["scripts"].append(script)
-        else:
-            script["id"] = f"script_{int(time.time() * 1000)}"
-            script.setdefault("lastRun", None)
-            script.setdefault("lastStatus", None)
-            script.setdefault("lastOutput", None)
-            db["scripts"].append(script)
+            existing = next((s for s in scripts if s["id"] == script_id), None)
+            if existing:
+                existing.update(clean)
+                clean["id"] = script_id
+                return
+        clean["id"] = f"script_{int(time.time() * 1000)}"
+        clean.update({"lastRun": None, "lastStatus": None, "lastOutput": None})
+        scripts.append(clean)
 
     update_db(updater)
     start_schedulers()
-    return {"success": True, "script": script}
+    return {"success": True, "script": clean}
 
 
-@app.delete("/api/scripts/{script_id}", dependencies=[Depends(verify_token)])
+@app.delete("/api/scripts/{script_id}", dependencies=[Depends(require_admin)])
 async def api_delete_script(script_id: str):
     def updater(db):
-        db["scripts"] = [s for s in db["scripts"] if s["id"] != script_id]
+        db["scripts"] = [s for s in db.get("scripts", []) if s["id"] != script_id]
         if "remote" in db and "widgets" in db["remote"]:
             db["remote"]["widgets"] = [
                 w for w in db["remote"]["widgets"] if w.get("scriptId") != script_id
@@ -292,7 +339,7 @@ async def api_delete_script(script_id: str):
     return {"success": True}
 
 
-@app.post("/api/scripts/run", dependencies=[Depends(verify_token)])
+@app.post("/api/scripts/run", dependencies=[Depends(require_any)])
 async def api_run_script(payload: dict):
     script_id = payload.get("id")
     trigger = payload.get("trigger", "manual")
@@ -302,7 +349,8 @@ async def api_run_script(payload: dict):
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
 
-    run_id = f"run_{int(time.time() * 1000)}"
+    run_id = f"run_{script_id}_{int(time.time() * 1000)}"
+    start_time_str = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     loop = asyncio.get_event_loop()
 
     async def run_and_save():
@@ -317,12 +365,6 @@ async def api_run_script(payload: dict):
         res = await executor.run(run_id, script, on_log)
         complete_output = "".join(output_log)
         end_time_str = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-
-        try:
-            ts_ms = int(run_id.split("_")[1])
-            start_time_str = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(ts_ms / 1000))
-        except Exception:
-            start_time_str = end_time_str
 
         def db_updater(data):
             scr = next((s for s in data["scripts"] if s["id"] == script_id), None)
@@ -341,7 +383,7 @@ async def api_run_script(payload: dict):
                 "endTime": end_time_str,
                 "status": res["status"],
                 "exitCode": res["code"],
-                "logs": complete_output,
+                "logs": complete_output[:50000],
             })
             data["history"] = data["history"][:100]
 
@@ -355,11 +397,13 @@ async def api_run_script(payload: dict):
             "exitCode": res["code"],
         })
 
-    asyncio.create_task(run_and_save())
+    task = asyncio.create_task(run_and_save())
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
     return {"success": True, "runId": run_id}
 
 
-@app.post("/api/scripts/cancel", dependencies=[Depends(verify_token)])
+@app.post("/api/scripts/cancel", dependencies=[Depends(require_any)])
 async def api_cancel_script(payload: dict):
     run_id = payload.get("runId")
     killed = executor.kill(run_id)
@@ -370,19 +414,18 @@ async def api_cancel_script(payload: dict):
 # REST API — REMOTE CONFIG
 # ─────────────────────────────────────────────────────────
 
-@app.get("/api/remote/config", dependencies=[Depends(verify_token)])
+@app.get("/api/remote/config", dependencies=[Depends(require_any)])
 async def api_get_remote_config():
-    db = read_db()
-    return db.get("remote", {"widgets": []})
+    return read_db().get("remote", {"widgets": []})
 
 
-@app.post("/api/remote/config", dependencies=[Depends(verify_token)])
+@app.post("/api/remote/config", dependencies=[Depends(require_admin)])
 async def api_save_remote_config(config: dict):
-    if "widgets" not in config:
+    if "widgets" not in config or not isinstance(config["widgets"], list):
         raise HTTPException(status_code=400, detail="Widgets list is required")
 
     def updater(db):
-        db["remote"] = config
+        db["remote"] = {"widgets": config["widgets"]}
 
     update_db(updater)
     await manager.broadcast({"type": "remote-reload"})
@@ -393,13 +436,12 @@ async def api_save_remote_config(config: dict):
 # REST API — HISTORY
 # ─────────────────────────────────────────────────────────
 
-@app.get("/api/history", dependencies=[Depends(verify_token)])
+@app.get("/api/history", dependencies=[Depends(require_admin)])
 async def api_get_history():
-    db = read_db()
-    return db.get("history", [])
+    return read_db().get("history", [])
 
 
-@app.delete("/api/history", dependencies=[Depends(verify_token)])
+@app.delete("/api/history", dependencies=[Depends(require_admin)])
 async def api_clear_history():
     def updater(db):
         db["history"] = []
@@ -411,23 +453,47 @@ async def api_clear_history():
 # REST API — SETTINGS
 # ─────────────────────────────────────────────────────────
 
-@app.get("/api/settings", dependencies=[Depends(verify_token)])
+@app.get("/api/settings", dependencies=[Depends(require_admin)])
 async def api_get_settings():
-    db = read_db()
-    s = db.get("settings", {})
+    s = read_db().get("settings", {})
     return {
         "port": s.get("port", 8080),
-        "secretToken": s.get("secretToken", ""),
         "username": s.get("username", "admin"),
-        "password": s.get("password", "admin"),
-        "remotePin": s.get("remotePin", "1234"),
+        "remotePin": s.get("remotePin", ""),
     }
 
 
-@app.post("/api/settings", dependencies=[Depends(verify_token)])
+@app.post("/api/settings", dependencies=[Depends(require_admin)])
 async def api_save_settings(settings: dict):
+    clean = {}
+
+    if "port" in settings:
+        try:
+            port = int(settings["port"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Port must be a number")
+        if not 1 <= port <= 65535:
+            raise HTTPException(status_code=400, detail="Port must be between 1 and 65535")
+        clean["port"] = port
+
+    if settings.get("username"):
+        clean["username"] = str(settings["username"]).strip()
+
+    if settings.get("password"):
+        password = str(settings["password"])
+        if len(password) < 4:
+            raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+        clean["password"] = hash_password(password)
+
+    if settings.get("remotePin"):
+        pin = str(settings["remotePin"])
+        if not (pin.isdigit() and len(pin) == 4):
+            raise HTTPException(status_code=400, detail="PIN must be exactly 4 digits")
+        clean["remotePin"] = pin
+
     def updater(db):
-        db.setdefault("settings", {}).update(settings)
+        db.setdefault("settings", {}).update(clean)
+
     update_db(updater)
     return {
         "success": True,
@@ -439,11 +505,10 @@ async def api_save_settings(settings: dict):
 # REST API — SSH CONNECTIONS
 # ─────────────────────────────────────────────────────────
 
-@app.get("/api/ssh/connections", dependencies=[Depends(verify_token)])
+@app.get("/api/ssh/connections", dependencies=[Depends(require_any)])
 async def api_get_ssh_connections():
-    db = read_db()
     result = []
-    for c in db.get("sshConnections", []):
+    for c in read_db().get("sshConnections", []):
         result.append({
             "id": c["id"],
             "name": c["name"],
@@ -455,34 +520,43 @@ async def api_get_ssh_connections():
     return result
 
 
-@app.post("/api/ssh/connections", dependencies=[Depends(verify_token)])
+@app.post("/api/ssh/connections", dependencies=[Depends(require_admin)])
 async def api_save_ssh_connection(conn: dict):
     if not conn.get("host") or not conn.get("username"):
         raise HTTPException(status_code=400, detail="Host and username are required")
 
+    try:
+        port = int(conn.get("port") or 22)
+    except (TypeError, ValueError):
+        port = 22
+
+    clean = {
+        "name": (conn.get("name") or conn["host"]).strip(),
+        "host": str(conn["host"]).strip(),
+        "port": port,
+        "username": str(conn["username"]).strip(),
+        "password": conn.get("password") or "",
+    }
     conn_id = conn.get("id")
 
     def updater(db):
         conns = db.setdefault("sshConnections", [])
         if conn_id:
-            idx = next((i for i, c in enumerate(conns) if c["id"] == conn_id), -1)
-            if idx != -1:
-                if not conn.get("password"):
-                    conn["password"] = conns[idx].get("password", "")
-                conns[idx] = conn
-            else:
-                if not conn.get("id"):
-                    conn["id"] = f"ssh_{int(time.time() * 1000)}"
-                conns.append(conn)
-        else:
-            conn["id"] = f"ssh_{int(time.time() * 1000)}"
-            conns.append(conn)
+            existing = next((c for c in conns if c["id"] == conn_id), None)
+            if existing:
+                if not clean["password"]:
+                    clean["password"] = existing.get("password", "")
+                clean["id"] = conn_id
+                existing.update(clean)
+                return
+        clean["id"] = f"ssh_{int(time.time() * 1000)}"
+        conns.append(clean)
 
     update_db(updater)
     return {"success": True}
 
 
-@app.delete("/api/ssh/connections/{conn_id}", dependencies=[Depends(verify_token)])
+@app.delete("/api/ssh/connections/{conn_id}", dependencies=[Depends(require_admin)])
 async def api_delete_ssh_connection(conn_id: str):
     def updater(db):
         db["sshConnections"] = [c for c in db.get("sshConnections", []) if c["id"] != conn_id]
@@ -491,11 +565,16 @@ async def api_delete_ssh_connection(conn_id: str):
 
 
 # ─────────────────────────────────────────────────────────
-# WEBSOCKET — MAIN
+# WEBSOCKET — MAIN (stats + live script logs)
 # ─────────────────────────────────────────────────────────
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    token = websocket.query_params.get("token", "")
+    if not _token_role(token):
+        await websocket.close(code=1008)
+        return
+
     await manager.connect(websocket)
     try:
         while True:
@@ -503,11 +582,11 @@ async def websocket_endpoint(websocket: WebSocket):
             msg = json.loads(data)
             msg_type = msg.get("type")
             if msg_type == "subscribe-stats":
-                await manager.subscribe_stats(websocket)
+                manager.subscribe_stats(websocket)
             elif msg_type == "unsubscribe-stats":
                 manager.unsubscribe_stats(websocket)
             elif msg_type == "subscribe-log" and msg.get("runId"):
-                await manager.subscribe_log(websocket, msg["runId"])
+                manager.subscribe_log(websocket, msg["runId"])
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
@@ -522,13 +601,11 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.websocket("/ws/ssh/{connection_id}")
 async def ssh_terminal_ws(websocket: WebSocket, connection_id: str):
     token = websocket.query_params.get("token", "")
-    db = read_db()
-    settings = db.get("settings", {})
-
-    if token != settings.get("secretToken", ""):
+    if not _token_role(token):
         await websocket.close(code=1008)
         return
 
+    db = read_db()
     conn = next((c for c in db.get("sshConnections", []) if c["id"] == connection_id), None)
     if not conn:
         await websocket.close(code=1008)
@@ -624,16 +701,19 @@ async def stats_broadcast_loop():
 # SERVE REACT FRONTEND
 # ─────────────────────────────────────────────────────────
 
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
 
 
 @app.get("/{catchall:path}")
 async def serve_frontend(catchall: str):
     if catchall.startswith("api/") or catchall.startswith("ws"):
         return JSONResponse(status_code=404, content={"error": "Not found"})
-    file_path = os.path.join(FRONTEND_DIR, catchall)
-    if os.path.isfile(file_path):
+
+    # Resolve and confine to the frontend build directory
+    file_path = os.path.realpath(os.path.join(FRONTEND_DIR, catchall))
+    if file_path.startswith(FRONTEND_DIR + os.sep) and os.path.isfile(file_path):
         return FileResponse(file_path)
+
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.isfile(index_path):
         return FileResponse(index_path)

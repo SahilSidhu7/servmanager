@@ -27,6 +27,7 @@ rm -rf "${TARGET_DIR}/opt/servmanager/backend/__pycache__"
 mkdir -p "${TARGET_DIR}/opt/servmanager/frontend"
 cp -R ../frontend/dist "${TARGET_DIR}/opt/servmanager/frontend/"
 cp ../README.md "${TARGET_DIR}/opt/servmanager/"
+cp ../servmanager-cli.sh "${TARGET_DIR}/opt/servmanager/"
 cp -R DEBIAN/* "${TARGET_DIR}/DEBIAN/"
 
 # Update version dynamically in control file

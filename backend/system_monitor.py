@@ -126,14 +126,6 @@ def get_active_ports() -> list:
                             pass
             except Exception as sub_err:
                 print(f"Fallback ss scan failed: {sub_err}")
-                
-        # Mock ports as backup for developer validation on Windows if it fails
-        if not ports:
-            ports = [
-                { "proto": "TCP", "port": 8080, "address": "0.0.0.0", "state": "LISTEN" },
-                { "proto": "TCP", "port": 22, "address": "0.0.0.0", "state": "LISTEN" },
-                { "proto": "UDP", "port": 53, "address": "0.0.0.0", "state": "ACTIVE" }
-            ]
 
     # Deduplicate and sort by port number
     unique_ports = []

@@ -1,215 +1,128 @@
-# ServManager
+<h1 align="center">ServManager</h1>
 
-**ServManager** is a self-hosted web-based server administration dashboard and mobile remote. Built with a Python FastAPI backend and a React frontend, it lets you monitor server health, write and run shell scripts, chain workflow automation steps, open SSH terminals in your browser, and control everything from your phone — all through a single port.
+<p align="center">
+  <b>A self-hosted dashboard and phone remote for your Linux server.</b><br/>
+  Watch live resources, run shell scripts from anywhere, and open SSH terminals in the browser — all on one port.
+</p>
 
----
-
-## Features
-
-- **Real-time Stats** — Live CPU, RAM, and disk tracking pushed over WebSocket.
-- **Script Editor** — Write and run shell scripts in the browser with a full code editor (line numbers, Tab indentation, auto-indent).
-- **Workflow Builder** — Chain shell commands, HTTP requests, TCP port checks, delays, and conditional branches into multi-step automation sequences.
-- **SSH Terminal** — Save SSH credentials in the app and open a full xterm.js terminal session in any browser — desktop or phone.
-- **Mobile Remote Panel** — A drag-and-drop customizable widget grid served at `/remote`. Supports button, indicator, live metric, and SSH launcher widgets.
-- **QR Code Sharing** — After saving your remote layout, a QR code appears for scanning directly from your phone.
-- **Auth Layers** — Username + password for the admin dashboard; a 4-digit PIN for the mobile remote.
-- **Background Polling** — Scripts can run on a schedule and push live status badges to all connected clients.
-- **Single Port** — Admin dashboard at `/` and mobile remote at `/remote` both served by the same FastAPI process on port 8080. No separate server needed.
-- **Zero Database** — All data stored in a single `data.json` file.
+<p align="center">
+  <a href="https://github.com/SahilSidhu7/servmanager/releases/latest"><img src="https://img.shields.io/github/v/release/SahilSidhu7/servmanager?label=download" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/backend-FastAPI-009688" alt="FastAPI">
+  <img src="https://img.shields.io/badge/frontend-React%2019-61dafb" alt="React 19">
+</p>
 
 ---
 
-## Installation (Debian / Ubuntu)
+Ever needed to restart a service, check disk space, or tail a script — and your laptop wasn't around? ServManager turns any Debian/Ubuntu box into something you can run from your phone:
 
-### Method 1: One-liner
+- **Live overview** — CPU, memory, and disk meters streamed over WebSocket, plus every listening port
+- **Scripts** — write shell scripts in a browser editor, run them on demand or on a schedule, stream output live, keep the last 100 run logs
+- **Mobile remote** — a PIN-locked widget panel at `/remote`: buttons that run scripts, health indicators, live metrics, SSH launchers. Design it with drag-and-drop, open it by scanning a QR code
+- **SSH terminals** — save a host once, get a full xterm.js terminal in any browser, desktop or phone
+- **One port, zero database** — dashboard and remote served by a single FastAPI process; everything lives in one `data.json`
+
+## Install (Debian / Ubuntu)
+
+**One-liner:**
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/sahilsidhu7/servmanager/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/SahilSidhu7/servmanager/main/install.sh | sudo bash
 ```
 
-This automatically installs system dependencies (`python3`, `nodejs`, `npm`), builds the React frontend, sets up a Python virtual environment, writes a `systemd` service, and installs the `servmanager` CLI command.
+Installs dependencies, builds the frontend, sets up a systemd service, and adds the `servmanager` CLI.
 
-### Method 2: From Source
+**From source:**
 
 ```bash
-git clone https://github.com/sahilsidhu7/servmanager.git
+git clone https://github.com/SahilSidhu7/servmanager.git
 cd servmanager
 sudo ./install.sh
 ```
 
-### Method 3: `.deb` Package
+**`.deb` package** — grab it from the [latest release](https://github.com/SahilSidhu7/servmanager/releases/latest):
 
 ```bash
-# Replace <version> with the latest tag from the Releases page
-wget https://github.com/sahilsidhu7/servmanager/releases/download/<version>/servmanager_<version>_all.deb
 sudo apt install ./servmanager_<version>_all.deb
 ```
 
----
+## First login
 
-## First Login
+Open `http://YOUR_SERVER_IP:8080/`
 
-After installation, open:
-
-```
-http://YOUR_SERVER_IP:8080/
-```
-
-**Default credentials:**
-
-| Field    | Default |
-|----------|---------|
+| | Default |
+|---|---|
 | Username | `admin` |
 | Password | `admin` |
+| Remote PIN | `1234` |
 
-> **Change these immediately** in the Settings tab after first login.
+> **Change all three in Settings right after your first sign-in.** Your password is stored hashed; the PIN unlocks the phone remote.
 
----
+## The mobile remote
 
-## Mobile Remote
+1. In the dashboard, open **Remote Designer** and add widgets — a button per script, live metrics, an SSH launcher.
+2. Click **Save layout** and scan the QR code with your phone.
+3. Enter your PIN. Done — tap tiles to run scripts and watch output live.
 
-```
-http://YOUR_SERVER_IP:8080/remote
-```
+The remote uses a limited-access token: it can view stats and trigger scripts, but it can't edit scripts, settings, or credentials.
 
-Default PIN: `1234` — change it in Settings.
-
-After saving your remote layout in the Designer tab, a QR code appears. Scan it to open the remote panel directly on your phone.
-
----
-
-## SSH Terminal
-
-Go to the **SSH Connections** tab, add a host with credentials, then click **Connect** to open a full terminal in your browser. Works on desktop and mobile.
-
-**Requires `asyncssh`** — the installer handles this automatically. If you're running from source:
+## CLI
 
 ```bash
-pip install asyncssh
+sudo servmanager start|stop|restart|status|logs
+sudo servmanager enable|disable          # autostart on boot
+sudo servmanager set-port 9090
+sudo servmanager set-pin 5678
+sudo servmanager set-auth user password
+sudo servmanager update                  # upgrade to the latest release
+sudo servmanager info|version|help
 ```
 
-If `asyncssh` is not installed, the rest of the app starts fine and shows a friendly error only when you try to open an SSH session.
+## SSH terminals
 
----
+Add a host under **SSH Hosts**, then click the terminal button — a full interactive terminal opens in your browser. Also available as a remote widget for your phone.
 
-## CLI Helper (`servmanager`)
+Requires `asyncssh` (the installer handles it). Without it, everything else still works and SSH shows a clear error.
 
-A `servmanager` command is installed system-wide after running the installer. All commands that modify the system require `sudo`.
+## Theming
 
-### Service Management
+All design tokens live in one file — edit and rebuild:
 
 ```bash
-sudo servmanager start
-sudo servmanager stop
-sudo servmanager restart
-sudo servmanager status
-sudo servmanager enable      # autostart on boot
-sudo servmanager disable
-sudo servmanager logs        # tail live logs
-```
-
-### Configuration
-
-```bash
-sudo servmanager set-port 9090       # change dashboard port
-sudo servmanager set-pin 5678        # change remote PIN (4 digits)
-sudo servmanager set-auth myuser mysecurepassword
-```
-
-### Maintenance
-
-```bash
-sudo servmanager update    # pull latest release from GitHub
-sudo servmanager info      # show install paths and URLs
-sudo servmanager version
-sudo servmanager help
-```
-
----
-
-## Remote Designer
-
-In the **Designer** tab:
-
-1. Pick a widget type from the library (button, indicator, metric, SSH launcher).
-2. Drag widgets in the grid to reorder them using the ✛ handle.
-3. Click **Save Layout** to persist. A QR code appears — scan it with your phone.
-
----
-
-## Customizing the Theme
-
-All design tokens live in one file:
-
-```
-frontend/src/theme.css
-```
-
-Edit the CSS variables, then rebuild:
-
-```bash
-cd /opt/servmanager/frontend
-npm run build
+nano /opt/servmanager/frontend/src/theme.css
+cd /opt/servmanager/frontend && npm run build
 sudo servmanager restart
 ```
 
-Key variables:
+## Security notes
 
-| Variable | Purpose |
-|---|---|
-| `--bg-dark` | Page background (`#111111`) |
-| `--bg-paper` | Sidebar / panels |
-| `--bg-card` | Card backgrounds |
-| `--primary` | Accent color (`#c45c1a` burnt orange) |
-| `--primary-light` | Hover / highlight variant |
-| `--text-main` | Body text |
-| `--text-muted` | Secondary text |
-| `--border-color` | Card / element borders |
-| `--font-sans` | Body font (IBM Plex Mono) |
-| `--font-mono` | Code / terminal font |
-| `--radius-md` | Border radius (`0px` by default — square) |
+ServManager is built for your LAN, home lab, or a VPN like Tailscale — don't expose it directly to the public internet.
 
----
+- Admin password is stored **hashed** (SHA-256 + salt); login and PIN attempts are rate-limited
+- The remote PIN grants a **restricted token** — view and run only, no configuration access
+- SSH host passwords are stored in `data.json` (mode `600`, root-only) so the server can open sessions on your behalf
+- Scripts run as the service user (root by default) — that's the point of the tool, so guard access to it
 
-## Settings Tab
+## Architecture
 
-From the **Settings** tab you can configure:
+- **Backend** — Python: FastAPI, uvicorn, psutil, asyncssh. REST + WebSocket (live stats, log streaming, SSH proxy)
+- **Frontend** — React 19 + Vite, plain CSS, no UI framework
+- **Persistence** — a single `data.json`, no database
 
-- **Port** — Change the port ServManager listens on (both admin and remote share it).
-- **Admin Credentials** — Update username and password.
-- **Remote PIN** — Update the 4-digit PIN for phone access.
-- **API Token** — Copy the internal security token.
-
----
-
-## Project Architecture
-
-- **Backend:** Python — FastAPI, uvicorn, asyncio, psutil, asyncssh
-- **Frontend:** React 19, Vite, Vanilla CSS
-- **Communication:** REST + WebSocket (real-time stats, log streaming, SSH terminal proxy)
-- **Persistence:** `data.json` — no database
-- **Theme:** `frontend/src/theme.css` — single file, all CSS variables
-
----
-
-## Local Development
+## Local development
 
 ```bash
 # Terminal 1 — backend
 cd backend
 pip install -r requirements.txt
-python -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+python -m uvicorn main:app --port 8080 --reload
 
-# Terminal 2 — frontend
+# Terminal 2 — frontend (proxies /api and /ws to :8080)
 cd frontend
 npm install
 npm run dev
 ```
 
-The frontend dev server proxies API calls to `localhost:8080` automatically.
-
----
-
 ## License
 
-MIT License. See `LICENSE` for details.
+MIT. See [LICENSE](LICENSE).

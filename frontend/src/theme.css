@@ -1,68 +1,57 @@
-/* ServManager — Charcoal & Dark Orange */
+/* ServManager design tokens — warm charcoal + burnt orange.
+   Edit these variables and rebuild to retheme the whole app. */
 :root {
-  /* Backgrounds — pure charcoal stack, no color cast.
-     Each step is just slightly lighter, nothing jarring. */
-  --bg-dark: #111111;
-  /* page root */
-  --bg-paper: #181818;
-  /* sidebar, topbar, log panel */
-  --bg-warm-1: #1f1f1f;
-  /* card background */
-  --bg-warm-2: #272727;
-  /* hover states */
-  --bg-warm-3: #2e2e2e;
-  /* active / pressed / track fills */
+  /* Surfaces — warm-tinted charcoal stack */
+  --bg: #131211;          /* page root */
+  --bg-panel: #191816;    /* sidebar, drawers */
+  --bg-card: #1e1c1a;     /* cards */
+  --bg-raised: #262320;   /* hover / pressed */
+  --bg-input: #171614;    /* form fields, code editor */
+  --bg-terminal: #0e0d0c; /* log + ssh terminal */
 
-  --bg-card: #1c1c1c;
-  --glass-blur: none;
-  --shadow-main: none;
-  --shadow-card: none;
+  /* Accent — burnt orange */
+  --primary: #d96a20;
+  --primary-light: #ea8440;
+  --primary-dark: #a84e14;
+  --primary-dim: rgba(217, 106, 32, 0.12);
 
-  /* Primary — dark burnt orange.
-     Not bright safety-orange, not rust-brown.
-     The mid-point that reads as "warm authority". */
-  --primary: #c45c1a;
-  --primary-dark: #9e4612;
-  --primary-light: #e07038;
-  --primary-dim: rgba(196, 92, 26, 0.10);
-  --primary-glow: #c45c1a;
-  /* gradient removed */
+  /* Status — desaturated to sit comfortably in charcoal */
+  --ok: #86a35c;
+  --warn: #cfa02e;
+  --danger: #c7504f;
+  --info: #5f8fa8;
+  --ok-dim: rgba(134, 163, 92, 0.14);
+  --warn-dim: rgba(207, 160, 46, 0.14);
+  --danger-dim: rgba(199, 80, 79, 0.14);
+  --info-dim: rgba(95, 143, 168, 0.14);
 
-  --accent: #c45c1a;
-  --accent-light: #e07038;
+  /* Text — warm off-white, three steps */
+  --text: #e6e0d6;
+  --text-muted: #98907f;
+  --text-dim: #575249;
 
-  /* Status — desaturated to live comfortably in charcoal.
-     Full-saturation green/red would fight the orange. */
-  --status-success: #7a9e5a;
-  --status-ok: #7a9e5a;
-  --status-ok-l: #96be70;
-  --status-warn: #c49a1a;
-  --status-danger: #b84040;
-  --status-danger-l: #d05555;
+  /* Borders */
+  --border: #2b2825;
+  --border-strong: #3a3631;
 
-  /* Text — warm off-white, never pure #fff.
-     Three steps: readable / secondary / ghost. */
-  --text-main: #d4cfc8;
-  --text-muted: #7a7268;
-  --text-dim: #4a4540;
+  /* Widget accent hues (remote tiles) */
+  --hue-indigo: #7a8fd4;
+  --hue-violet: #a687c9;
+  --hue-emerald: #6fae8f;
+  --hue-amber: #cfa02e;
+  --hue-rose: #c9798f;
+  --hue-cyan: #6aacb8;
+  --hue-orange: #d96a20;
 
-  /* Borders — almost invisible seams, not glowing lines. */
-  --border-color: #2a2a2a;
-  --border-focus: #c45c1a;
-  --border-glow: rgba(196, 92, 26, 0.2);
+  /* Typography — system stacks, no network fetch needed */
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
 
-  --bg-input: #1c1c1c;
+  /* Geometry */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
 
-  /* Typography */
-  --font-mono: 'IBM Plex Mono', 'Fira Code', 'Courier New', monospace;
-  --font-sans: 'IBM Plex Mono', monospace;
-
-  /* Geometry — square corners, retro feel */
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --border-width: 1px;
-
-  --transition-fast: all 0.1s ease;
-  --transition-smooth: all 0.18s ease;
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.55);
+  --transition: 0.15s ease;
 }

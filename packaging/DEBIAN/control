@@ -5,6 +5,6 @@ Maintainer: SahilSidhu7 <sahilsidhu3127@gmail.com>
 Depends: python3, python3-pip, python3-venv, nodejs, npm, systemd
 Description: ServManager Dashboard
  Self-hosted server administration dashboard and mobile remote.
- Write and run shell scripts, build multi-step automation workflows,
- open SSH terminals in the browser, and control everything from a
- PIN-protected mobile remote panel. Single port, zero database.
+ Monitor live resources, write and run shell scripts on demand or
+ on a schedule, open SSH terminals in the browser, and control it
+ all from a PIN-protected mobile remote. Single port, zero database.
