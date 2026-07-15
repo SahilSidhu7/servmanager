@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://github.com/SahilSidhu7/servmanager/releases/latest"><img src="https://img.shields.io/github/v/release/SahilSidhu7/servmanager?label=download" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <a href="https://sahilsidhu7.github.io/servmanager-landing/"><img src="https://img.shields.io/badge/website-servmanager-d96a20" alt="Website"></a>
   <img src="https://img.shields.io/badge/backend-FastAPI-009688" alt="FastAPI">
   <img src="https://img.shields.io/badge/frontend-React%2019-61dafb" alt="React 19">
 </p>
@@ -60,11 +61,13 @@ Open `http://YOUR_SERVER_IP:8080/`
 
 ## The mobile remote
 
-1. In the dashboard, open **Remote Designer** and add widgets — a button per script, live metrics, an SSH launcher.
+1. In the dashboard, open **Remote Designer** — a live phone-frame preview of your remote. Add widgets from the palette (script buttons, live metrics, health indicators, SSH launchers), tap any tile to edit its label, size, color, and icon, drag to reorder.
 2. Click **Save layout** and scan the QR code with your phone.
 3. Enter your PIN. Done — tap tiles to run scripts and watch output live.
 
-The remote uses a limited-access token: it can view stats and trigger scripts, but it can't edit scripts, settings, or credentials.
+Saved SSH hosts also appear on the remote automatically under **Terminals** — one tap opens a full terminal on your phone, no widget setup needed.
+
+The remote uses a limited-access token: it can view stats, trigger scripts, and open terminals, but it can't edit scripts, settings, or credentials.
 
 ## CLI
 
@@ -80,9 +83,13 @@ sudo servmanager info|version|help
 
 ## SSH terminals
 
-Add a host under **SSH Hosts**, then click the terminal button — a full interactive terminal opens in your browser. Also available as a remote widget for your phone.
+Add a host under **SSH Hosts**, then click the terminal button — a full interactive terminal opens in your browser. Every saved host is also one tap away on the phone remote.
 
 Requires `asyncssh` (the installer handles it). Without it, everything else still works and SSH shows a clear error.
+
+## Website & docs
+
+Landing page, install guide, CLI reference, and troubleshooting: **[sahilsidhu7.github.io/servmanager-landing](https://sahilsidhu7.github.io/servmanager-landing/)** ([docs](https://sahilsidhu7.github.io/servmanager-landing/docs.html))
 
 ## Theming
 

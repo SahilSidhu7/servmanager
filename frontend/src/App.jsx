@@ -211,17 +211,35 @@ export default function App() {
           </div>
         </header>
 
-        <main className="remote-grid">
-          {remoteWidgets.length === 0
-            ? <div className="empty-state"><Icon name="layout" /><p>No widgets yet. Open the admin dashboard and add some in Remote Designer.</p></div>
-            : [...remoteWidgets].sort((a, b) => a.position - b.position).map(w => (
-              <RemoteWidget key={w.id} widget={w} stats={stats} scripts={scripts}
-                sshConnections={sshConnections}
-                running={isRunning && run.scriptId === w.scriptId}
-                onRun={(s) => runScript(s, 'remote')}
-                onSsh={setSshTerminalConn} />
-            ))
-          }
+        <main className="remote-main">
+          <div className="remote-grid">
+            {remoteWidgets.length === 0
+              ? <div className="empty-state"><Icon name="layout" /><p>No widgets yet. Open the admin dashboard and add some in Remote Designer.</p></div>
+              : [...remoteWidgets].sort((a, b) => a.position - b.position).map(w => (
+                <RemoteWidget key={w.id} widget={w} stats={stats} scripts={scripts}
+                  sshConnections={sshConnections}
+                  running={isRunning && run.scriptId === w.scriptId}
+                  onRun={(s) => runScript(s, 'remote')}
+                  onSsh={setSshTerminalConn} />
+              ))
+            }
+          </div>
+          {sshConnections.length > 0 && (
+            <section className="remote-ssh-strip">
+              <span className="strip-label">Terminals</span>
+              <div className="ssh-chip-row">
+                {sshConnections.map(c => (
+                  <button key={c.id} className="ssh-chip" onClick={() => setSshTerminalConn(c)}>
+                    <Icon name="ssh" />
+                    <span className="chip-text">
+                      <span className="chip-name">{c.name}</span>
+                      <span className="chip-sub mono">{c.username}@{c.host}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </main>
 
         <div className={`console-drawer ${runOpen ? '' : 'hidden'}`}>
@@ -304,7 +322,7 @@ export default function App() {
         )}
         {view === 'remote-designer' && (
           <RemoteDesignerView widgets={remoteWidgets} setWidgets={setRemoteWidgets}
-            scripts={scripts} sshConnections={sshConnections} api={api} addToast={addToast} />
+            scripts={scripts} sshConnections={sshConnections} api={api} addToast={addToast} stats={stats} />
         )}
         {view === 'ssh' && (
           <SshView connections={sshConnections} api={api} addToast={addToast} setConfirm={setConfirm}
@@ -702,46 +720,69 @@ function ScriptsView({ scripts, api, addToast, setConfirm, onRun, refresh }) {
 // ─────────────────────────────────────────────────────────
 // View: Remote Designer
 // ─────────────────────────────────────────────────────────
-function RemoteDesignerView({ widgets, setWidgets, scripts, sshConnections, api, addToast }) {
-  const [form, setForm] = useState({
-    title: '', description: '', type: 'button', scriptId: '', sshConnectionId: '',
-    metricType: 'cpu', size: 'small', color: 'orange', icon: 'terminal',
-  });
-  const [qr, setQr] = useState(null); // remote URL after save
+function RemoteDesignerView({ widgets, setWidgets, scripts, sshConnections, api, addToast, stats }) {
+  const [editing, setEditing] = useState(null); // widget draft being edited, or null
+  const [qr, setQr] = useState(null);
+  const [dirty, setDirty] = useState(false);
   const dragItem = useRef(null);
   const [dragOverId, setDragOverId] = useState(null);
 
-  const addWidget = (e) => {
-    e.preventDefault();
-    if ((form.type === 'button' || form.type === 'indicator') && !form.scriptId) {
+  const sorted = [...widgets].sort((a, b) => a.position - b.position);
+
+  const mutate = (fn) => { setWidgets(fn); setDirty(true); };
+
+  const startNew = (type) => setEditing({
+    id: null,
+    type,
+    title: '',
+    description: '',
+    scriptId: scripts[0]?.id || '',
+    sshConnectionId: sshConnections[0]?.id || '',
+    metricType: 'cpu',
+    size: 'small',
+    color: 'orange',
+    icon: type === 'ssh' ? 'ssh' : type === 'metric' ? 'stats' : type === 'indicator' ? 'heart-rate' : 'terminal',
+  });
+
+  const startEdit = (w) => setEditing({ ...w });
+
+  const commitEditor = (draft) => {
+    if ((draft.type === 'button' || draft.type === 'indicator') && !draft.scriptId) {
       addToast('Pick a script for this widget', 'error');
       return;
     }
-    if (form.type === 'ssh' && !form.sshConnectionId) {
+    if (draft.type === 'ssh' && !draft.sshConnectionId) {
       addToast('Pick an SSH host for this widget', 'error');
       return;
     }
-    setWidgets(prev => [...prev, {
-      id: 'widget_' + Date.now(),
-      title: form.title,
-      description: form.description,
-      type: form.type,
-      scriptId: (form.type === 'button' || form.type === 'indicator') ? form.scriptId : null,
-      sshConnectionId: form.type === 'ssh' ? form.sshConnectionId : null,
-      metricType: form.type === 'metric' ? form.metricType : null,
-      size: form.size,
-      color: form.color,
-      icon: form.icon,
-      position: prev.length,
-    }]);
-    setForm({ ...form, title: '', description: '' });
+    if (!draft.title.trim()) {
+      addToast('Give the widget a label', 'error');
+      return;
+    }
+    const clean = {
+      ...draft,
+      title: draft.title.trim(),
+      scriptId: (draft.type === 'button' || draft.type === 'indicator') ? draft.scriptId : null,
+      sshConnectionId: draft.type === 'ssh' ? draft.sshConnectionId : null,
+      metricType: draft.type === 'metric' ? draft.metricType : null,
+    };
+    if (draft.id) {
+      mutate(prev => prev.map(w => w.id === draft.id ? { ...w, ...clean } : w));
+    } else {
+      mutate(prev => [...prev, { ...clean, id: 'widget_' + Date.now(), position: prev.length }]);
+    }
+    setEditing(null);
   };
 
-  const removeWidget = (id) => setWidgets(prev => prev.filter(w => w.id !== id).map((w, i) => ({ ...w, position: i })));
+  const removeWidget = (id) => {
+    mutate(prev => prev.filter(w => w.id !== id).map((w, i) => ({ ...w, position: i })));
+    setEditing(null);
+  };
 
   const saveLayout = async () => {
     try {
       await api('/api/remote/config', 'POST', { widgets });
+      setDirty(false);
       const info = await api('/api/system/info');
       setQr(info.remoteUrl || `${window.location.origin}/remote`);
       addToast('Remote layout saved', 'success');
@@ -754,149 +795,122 @@ function RemoteDesignerView({ widgets, setWidgets, scripts, sshConnections, api,
     e.preventDefault();
     setDragOverId(null);
     if (!dragItem.current || dragItem.current === targetId) return;
-    setWidgets(prev => {
-      const sorted = [...prev].sort((a, b) => a.position - b.position);
-      const fi = sorted.findIndex(w => w.id === dragItem.current);
-      const ti = sorted.findIndex(w => w.id === targetId);
+    mutate(prev => {
+      const s = [...prev].sort((a, b) => a.position - b.position);
+      const fi = s.findIndex(w => w.id === dragItem.current);
+      const ti = s.findIndex(w => w.id === targetId);
       if (fi === -1 || ti === -1) return prev;
-      const [moved] = sorted.splice(fi, 1);
-      sorted.splice(ti, 0, moved);
-      return sorted.map((w, i) => ({ ...w, position: i }));
+      const [moved] = s.splice(fi, 1);
+      s.splice(ti, 0, moved);
+      return s.map((w, i) => ({ ...w, position: i }));
     });
     dragItem.current = null;
   };
+
+  const QUICK_ADD = [
+    { type: 'button', icon: 'play', label: 'Script button', desc: 'Tap to run a script' },
+    { type: 'metric', icon: 'stats', label: 'Live metric', desc: 'CPU, RAM, disk, uptime' },
+    { type: 'indicator', icon: 'heart-rate', label: 'Health indicator', desc: 'Last result of a scheduled script' },
+    { type: 'ssh', icon: 'ssh', label: 'SSH terminal', desc: 'One-tap terminal to a host' },
+  ];
 
   return (
     <div className="view-section">
       <div className="view-head">
         <div>
           <h1>Remote Designer</h1>
-          <p className="muted">Build the control panel you'll use from your phone at <span className="mono">/remote</span>.</p>
+          <p className="muted">Everything you place here shows up on your phone at <span className="mono">/remote</span>. Tap a tile to edit it, drag to reorder.</p>
         </div>
         <div className="head-actions">
           <a href="/remote" target="_blank" rel="noreferrer" className="btn btn-ghost"><Icon name="external-link" /> Open remote</a>
-          <button className="btn btn-primary" onClick={saveLayout}><Icon name="save" /> Save layout</button>
+          <button className="btn btn-primary" onClick={saveLayout}>
+            <Icon name="save" /> Save layout{dirty ? ' •' : ''}
+          </button>
         </div>
       </div>
 
       <div className="designer-layout">
-        <form className="card designer-form" onSubmit={addWidget}>
-          <h4>Add widget</h4>
-          <div className="form-group">
-            <label htmlFor="w-title">Label</label>
-            <input id="w-title" type="text" required value={form.title}
-              onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Restart Nginx" />
-          </div>
-          <div className="form-group">
-            <label htmlFor="w-desc">Subtitle <span className="muted">(optional)</span></label>
-            <input id="w-desc" type="text" value={form.description}
-              onChange={e => setForm({ ...form, description: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="w-type">Type</label>
-            <select id="w-type" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-              <option value="button">Button — runs a script</option>
-              <option value="indicator">Indicator — shows script health</option>
-              <option value="metric">Metric — live CPU/RAM/disk</option>
-              <option value="ssh">SSH — opens a terminal</option>
-            </select>
-          </div>
-
-          {(form.type === 'button' || form.type === 'indicator') && (
-            <div className="form-group">
-              <label htmlFor="w-script">Script</label>
-              <select id="w-script" value={form.scriptId} onChange={e => setForm({ ...form, scriptId: e.target.value })}>
-                <option value="">— Pick a script —</option>
-                {scripts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              {form.type === 'indicator' && <small className="muted">Indicators work best with scheduled scripts — the dot shows the last exit status.</small>}
-            </div>
-          )}
-
-          {form.type === 'metric' && (
-            <div className="form-group">
-              <label htmlFor="w-metric">Metric</label>
-              <select id="w-metric" value={form.metricType} onChange={e => setForm({ ...form, metricType: e.target.value })}>
-                <option value="cpu">CPU usage</option>
-                <option value="ram">Memory usage</option>
-                <option value="disk">Disk usage</option>
-                <option value="uptime">Uptime</option>
-              </select>
-            </div>
-          )}
-
-          {form.type === 'ssh' && (
-            <div className="form-group">
-              <label htmlFor="w-ssh">SSH host</label>
-              <select id="w-ssh" value={form.sshConnectionId} onChange={e => setForm({ ...form, sshConnectionId: e.target.value })}>
-                <option value="">— Pick a host —</option>
-                {sshConnections.map(c => <option key={c.id} value={c.id}>{c.name} ({c.username}@{c.host})</option>)}
-              </select>
-              {sshConnections.length === 0 && <small className="muted">No hosts saved yet — add one under SSH Hosts.</small>}
-            </div>
-          )}
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="w-size">Size</label>
-              <select id="w-size" value={form.size} onChange={e => setForm({ ...form, size: e.target.value })}>
-                <option value="small">Small</option>
-                <option value="medium">Wide</option>
-                <option value="large">Large</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label htmlFor="w-color">Color</label>
-              <select id="w-color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })}>
-                {WIDGET_COLORS.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Icon</label>
-            <div className="icon-picker">
-              {WIDGET_ICONS.map(([name, label]) => (
-                <button key={name} type="button" title={label}
-                  className={`icon-pick-btn ${form.icon === name ? 'selected' : ''}`}
-                  onClick={() => setForm({ ...form, icon: name })}>
-                  <Icon name={name} />
+        <div className="designer-side">
+          <div className="card designer-palette">
+            <h4>Add a widget</h4>
+            <div className="palette-list">
+              {QUICK_ADD.map(q => (
+                <button key={q.type} className="palette-item" onClick={() => startNew(q.type)}>
+                  <span className="widget-icon"><Icon name={q.icon} /></span>
+                  <span className="palette-text">
+                    <span className="palette-label">{q.label}</span>
+                    <span className="palette-desc">{q.desc}</span>
+                  </span>
+                  <Icon name="plus" className="icon-svg palette-plus" />
                 </button>
               ))}
             </div>
-          </div>
-
-          <button type="submit" className="btn btn-primary btn-block"><Icon name="plus" /> Add widget</button>
-        </form>
-
-        <div className="card designer-canvas">
-          <div className="card-head">
-            <h4>Preview <span className="muted small">drag to reorder</span></h4>
-            <span className="badge badge-neutral">{widgets.length} widgets</span>
-          </div>
-          <div className="remote-grid preview">
-            {widgets.length === 0
-              ? <div className="empty-state"><Icon name="layout" /><p>Empty. Add widgets from the left, then save.</p></div>
-              : [...widgets].sort((a, b) => a.position - b.position).map(w => (
-                <div key={w.id}
-                  className={`remote-widget preview-widget size-${w.size} accent-${w.color}${dragOverId === w.id ? ' drag-over' : ''}`}
-                  draggable
-                  onDragStart={e => { dragItem.current = w.id; e.dataTransfer.effectAllowed = 'move'; }}
-                  onDragOver={e => { e.preventDefault(); if (w.id !== dragItem.current) setDragOverId(w.id); }}
-                  onDrop={e => onDrop(e, w.id)}
-                  onDragEnd={() => { setDragOverId(null); dragItem.current = null; }}>
-                  <button className="widget-remove" onClick={() => removeWidget(w.id)} aria-label={`Remove ${w.title}`}>&times;</button>
-                  <div className="widget-icon"><Icon name={w.icon} /></div>
-                  <div className="widget-body">
-                    <div className="widget-title">{w.title}</div>
-                    <div className="widget-sub muted">{w.type === 'metric' ? w.metricType : w.type}</div>
-                  </div>
-                </div>
-              ))
-            }
+            {scripts.length === 0 && (
+              <p className="muted small palette-note">No scripts yet — buttons and indicators need one. Create scripts first.</p>
+            )}
+            {sshConnections.length === 0 && (
+              <p className="muted small palette-note">Saved SSH hosts also appear on the remote automatically under "Terminals".</p>
+            )}
           </div>
         </div>
+
+        <div className="phone-shell">
+          <div className="phone-frame">
+            <div className="phone-notch" />
+            <div className="phone-screen">
+              <div className="remote-header mini">
+                <div className="remote-brand">
+                  <Icon name="server" />
+                  <div>
+                    <h1>ServManager</h1>
+                    <span className="mono muted">{stats.hostname}</span>
+                  </div>
+                </div>
+                <span className="live-dot" />
+              </div>
+              <div className="remote-grid preview">
+                {sorted.length === 0
+                  ? <div className="empty-state"><Icon name="layout" /><p>Empty screen. Add widgets from the left.</p></div>
+                  : sorted.map(w => (
+                    <div key={w.id}
+                      className={`design-tile size-${w.size}${dragOverId === w.id ? ' drag-over' : ''}`}
+                      draggable
+                      onDragStart={e => { dragItem.current = w.id; e.dataTransfer.effectAllowed = 'move'; }}
+                      onDragOver={e => { e.preventDefault(); if (w.id !== dragItem.current) setDragOverId(w.id); }}
+                      onDrop={e => onDrop(e, w.id)}
+                      onDragEnd={() => { setDragOverId(null); dragItem.current = null; }}>
+                      <RemoteWidget widget={w} stats={stats} scripts={scripts}
+                        sshConnections={sshConnections} running={false}
+                        onRun={() => {}} onSsh={() => {}} />
+                      <button className="design-tile-hit" onClick={() => startEdit(w)}
+                        aria-label={`Edit ${w.title}`}>
+                        <span className="design-tile-edit"><Icon name="edit" /> Edit</span>
+                      </button>
+                    </div>
+                  ))
+                }
+              </div>
+              {sshConnections.length > 0 && (
+                <div className="remote-ssh-strip preview-strip">
+                  <span className="strip-label">Terminals</span>
+                  <div className="ssh-chip-row">
+                    {sshConnections.map(c => (
+                      <span key={c.id} className="ssh-chip static"><Icon name="ssh" />{c.name}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <p className="muted small phone-hint">Live preview — metrics show this server's real numbers.</p>
+        </div>
       </div>
+
+      {editing && (
+        <WidgetEditor draft={editing} setDraft={setEditing} scripts={scripts}
+          sshConnections={sshConnections} stats={stats}
+          onSave={commitEditor} onRemove={removeWidget} onClose={() => setEditing(null)} />
+      )}
 
       {qr && (
         <Modal title="Open on your phone" onClose={() => setQr(null)}>
@@ -913,6 +927,139 @@ function RemoteDesignerView({ widgets, setWidgets, scripts, sshConnections, api,
         </Modal>
       )}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+// Widget editor modal (Remote Designer)
+// ─────────────────────────────────────────────────────────
+const TYPE_LABELS = {
+  button: 'Script button',
+  indicator: 'Health indicator',
+  metric: 'Live metric',
+  ssh: 'SSH terminal',
+};
+
+function WidgetEditor({ draft, setDraft, scripts, sshConnections, stats, onSave, onRemove, onClose }) {
+  const set = (patch) => setDraft(d => ({ ...d, ...patch }));
+
+  const preview = {
+    ...draft,
+    id: draft.id || 'preview',
+    title: draft.title || 'Widget label',
+    position: 0,
+  };
+
+  return (
+    <Modal title={draft.id ? `Edit — ${TYPE_LABELS[draft.type]}` : `New — ${TYPE_LABELS[draft.type]}`} onClose={onClose} wide
+      footer={
+        <>
+          {draft.id && (
+            <button className="btn btn-ghost danger-text" style={{ marginRight: 'auto' }}
+              onClick={() => onRemove(draft.id)}>
+              <Icon name="trash" /> Remove widget
+            </button>
+          )}
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={() => onSave(draft)}>
+            <Icon name="check" /> {draft.id ? 'Apply changes' : 'Add to remote'}
+          </button>
+        </>
+      }>
+      <div className="widget-editor-layout">
+        <div className="widget-editor-form">
+          <div className="form-row">
+            <div className="form-group flex-2">
+              <label htmlFor="we-title">Label</label>
+              <input id="we-title" type="text" value={draft.title} autoFocus
+                onChange={e => set({ title: e.target.value })}
+                placeholder={draft.type === 'ssh' ? 'e.g. Web server' : draft.type === 'metric' ? 'e.g. CPU' : 'e.g. Restart Nginx'} />
+            </div>
+            <div className="form-group flex-2">
+              <label htmlFor="we-desc">Subtitle <span className="muted">(optional)</span></label>
+              <input id="we-desc" type="text" value={draft.description}
+                onChange={e => set({ description: e.target.value })} />
+            </div>
+          </div>
+
+          {(draft.type === 'button' || draft.type === 'indicator') && (
+            <div className="form-group">
+              <label htmlFor="we-script">Script to {draft.type === 'button' ? 'run' : 'watch'}</label>
+              <select id="we-script" value={draft.scriptId} onChange={e => set({ scriptId: e.target.value })}>
+                <option value="">— Pick a script —</option>
+                {scripts.map(s => <option key={s.id} value={s.id}>{s.name}{(s.interval || 0) > 0 ? ` (every ${s.interval}s)` : ''}</option>)}
+              </select>
+              {draft.type === 'indicator' && <small className="muted">The dot shows the script's last exit status — works best with scheduled scripts.</small>}
+            </div>
+          )}
+
+          {draft.type === 'metric' && (
+            <div className="form-group">
+              <label>Metric</label>
+              <div className="segmented">
+                {[['cpu', 'CPU'], ['ram', 'RAM'], ['disk', 'Disk'], ['uptime', 'Uptime']].map(([v, l]) => (
+                  <button key={v} type="button" className={draft.metricType === v ? 'on' : ''}
+                    onClick={() => set({ metricType: v })}>{l}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {draft.type === 'ssh' && (
+            <div className="form-group">
+              <label htmlFor="we-ssh">SSH host</label>
+              <select id="we-ssh" value={draft.sshConnectionId} onChange={e => set({ sshConnectionId: e.target.value })}>
+                <option value="">— Pick a host —</option>
+                {sshConnections.map(c => <option key={c.id} value={c.id}>{c.name} ({c.username}@{c.host})</option>)}
+              </select>
+              {sshConnections.length === 0 && <small className="muted">No hosts saved yet — add one under SSH Hosts first.</small>}
+            </div>
+          )}
+
+          <div className="form-group">
+            <label>Size</label>
+            <div className="segmented">
+              {[['small', 'Small'], ['medium', 'Wide'], ['large', 'Large']].map(([v, l]) => (
+                <button key={v} type="button" className={draft.size === v ? 'on' : ''}
+                  onClick={() => set({ size: v })}>{l}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Color</label>
+            <div className="swatch-row">
+              {WIDGET_COLORS.map(c => (
+                <button key={c} type="button" title={c}
+                  className={`swatch accent-${c}${draft.color === c ? ' selected' : ''}`}
+                  onClick={() => set({ color: c })} aria-label={`Color ${c}`} />
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Icon</label>
+            <div className="icon-picker">
+              {WIDGET_ICONS.map(([name, label]) => (
+                <button key={name} type="button" title={label}
+                  className={`icon-pick-btn ${draft.icon === name ? 'selected' : ''}`}
+                  onClick={() => set({ icon: name })}>
+                  <Icon name={name} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="widget-editor-preview">
+          <span className="strip-label">Preview</span>
+          <div className="remote-grid preview single">
+            <RemoteWidget widget={preview} stats={stats} scripts={scripts}
+              sshConnections={sshConnections} running={false} onRun={() => {}} onSsh={() => {}} />
+          </div>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
